@@ -1,0 +1,68 @@
+name: static analysis
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - '*.x'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version:
+          - 8.1
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    name: Static Analysis with code coverage
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.1
+          tools: composer:v2
+          coverage: none
+          extensions: redis, pcntl
+
+      - name: Install dependencies
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
+
+      - name: Static analyze check
+        run: php -d memory_limit=400M vendor/bin/phpstan
+
+      - name: Code coverage
+        run: vendor/bin/phpunit --coverage-clover=coverage.xml
+        env:
+          TESTING_REDIS_HOST: localhost
+          TESTING_REDIS_PORT: 6379
+
+      - name: Send code coverage report to Codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml

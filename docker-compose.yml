@@ -1,0 +1,68 @@
+services:
+  valkey:
+    container_name: flexid_valkey
+    image: valkey/valkey:8.1-alpine3.21
+
+  php81:
+    container_name: flexid_php81
+    build:
+      dockerfile: Dockerfile_alpine3_19
+      no_cache: true
+      args:
+        PHP_VERSION: 81
+    volumes:
+      - ./:/var/www/
+    tty: true
+    depends_on:
+      - valkey
+    environment:
+      TESTING_REDIS_HOST: 'flexid_valkey'
+      TESTING_REDIS_PORT: 6379
+
+  php82:
+    container_name: flexid_php82
+    build:
+      dockerfile: Dockerfile_alpine3_22
+      no_cache: true
+      args:
+        PHP_VERSION: 82
+    volumes:
+      - ./:/var/www/
+    tty: true
+    depends_on:
+      - valkey
+    environment:
+      TESTING_REDIS_HOST: 'flexid_valkey'
+      TESTING_REDIS_PORT: 6379
+
+  php83:
+    container_name: flexid_php83
+    build:
+      dockerfile: Dockerfile_alpine3_22
+      no_cache: true
+      args:
+        PHP_VERSION: 83
+    volumes:
+      - ./:/var/www/
+    tty: true
+    depends_on:
+      - valkey
+    environment:
+      TESTING_REDIS_HOST: 'flexid_valkey'
+      TESTING_REDIS_PORT: 6379
+
+  php84:
+    container_name: flexid_php84
+    build:
+      dockerfile: Dockerfile_alpine3_22
+      no_cache: true
+      args:
+        PHP_VERSION: 84
+    volumes:
+      - ./:/var/www/
+    tty: true
+    depends_on:
+      - valkey
+    environment:
+      TESTING_REDIS_HOST: 'flexid_valkey'
+      TESTING_REDIS_PORT: 6379

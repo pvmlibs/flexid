@@ -1,0 +1,44 @@
+name: tests
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+jobs:
+  phptests:
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        operating-system: [ 'ubuntu-latest' ]
+        php-versions: [ '8.2', '8.3', '8.4' ]
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-versions }}
+          tools: composer:v2
+          coverage: none
+          extensions: redis, pcntlc
+
+      - name: Install dependencies
+        run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
+
+      - name: PHPUnit Test
+        run: vendor/bin/phpunit --no-coverage --display-incomplete --display-skipped --display-deprecations --display-errors --display-notices --display-warnings
+        env:
+          TESTING_REDIS_HOST: localhost
+          TESTING_REDIS_PORT: 6379

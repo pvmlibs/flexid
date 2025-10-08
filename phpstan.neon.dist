@@ -1,0 +1,27 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan-phpunit/extension.neon
+    - vendor/phpstan/phpstan-phpunit/rules.neon
+    - vendor/spaze/phpstan-disallowed-calls/extension.neon
+    - vendor/spaze/phpstan-disallowed-calls/disallowed-dangerous-calls.neon
+    - vendor/spaze/phpstan-disallowed-calls/disallowed-execution-calls.neon
+
+parameters:
+    level: 8
+    checkUninitializedProperties: true
+    checkDynamicProperties: true
+    checkMissingTypehints: true
+    checkExplicitMixedMissingReturn: false
+    checkFunctionArgumentTypes: true
+    checkArgumentsPassedByReference: true
+    checkMissingCallableSignature: true
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkBenevolentUnionTypes: true
+    paths:
+        - src
+        - tests
+    tmpDir: cache/phpstan
+
+
+
+

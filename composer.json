@@ -1,0 +1,59 @@
+{
+  "name": "pvmlibs/flexid",
+  "description": "Fast unique 64-bit integer ID generator",
+  "type": "library",
+  "keywords": [
+    "id",
+    "integer",
+    "generator",
+    "fast",
+    "unique"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Paweł Lange",
+      "email": "pvmlibs@gmail.com",
+      "homepage": "https://github.com/pvmlibs"
+    }
+  ],
+  "minimum-stability": "stable",
+  "require": {
+    "php-64bit": ">=8.1"
+  },
+  "require-dev": {
+    "ext-pcntl": "*",
+    "ext-redis": "*",
+    "friendsofphp/php-cs-fixer": "^3.84",
+    "phpstan/phpstan": "^2.0",
+    "phpstan/phpstan-phpunit": "^2.0",
+    "phpstan/phpstan-strict-rules": "^2.0",
+    "phpunit/phpunit": "^10.0.0",
+    "predis/predis": "^2.0",
+    "spaze/phpstan-disallowed-calls": "^4.2"
+  },
+  "config": {
+    "preferred-install": "dist",
+    "sort-packages": true
+  },
+  "autoload": {
+    "psr-4": {
+      "Pvmlibs\\FlexId\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests"
+    }
+  },
+  "suggest": {
+    "ext-redis": "Faster Redis/Valkey communication"
+  },
+  "scripts": {
+    "check": [
+      "vendor/bin/php-cs-fixer check",
+      "php -d memory_limit=400M vendor/bin/phpstan",
+      "vendor/bin/phpunit --display-incomplete --display-skipped --display-deprecations --display-errors --display-notices --display-warnings"
+    ]
+  }
+}
