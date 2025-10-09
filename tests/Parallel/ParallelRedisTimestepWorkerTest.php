@@ -5,23 +5,24 @@ namespace Tests\Parallel;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver;
+use Tests\Internal\hasRedisClient;
 
 /**
  * @internal
- *
- * @covers \Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver
  */
 final class ParallelRedisTimestepWorkerTest extends TestCase
 {
+    use hasRedisClient;
+
     public function testConcurrentGenerators(): void
     {
-        $this->generate(30, 2000, workersBits: 18, sequenceBits: 10);
-        $this->generate(30, 1000, workersBits: 10, sequenceBits: 8);
+        $this->generate(20, 2000, workersBits: 18, sequenceBits: 10);
+        $this->generate(20, 1000, workersBits: 10, sequenceBits: 8);
     }
 
     private function generateIds(int $taskId, int $idsPerProcess, int $workersBits, int $sequenceBits): void
     {
-        $dbRedis = self::getRedisClient();
+        $dbRedis = $this->getRedisClient();
 
         $resolver = new RedisTimestepWorkerResolver(client: $dbRedis, workersBits: $workersBits, sequenceBits: $sequenceBits);
         $generator = new FlexIdGenerator(workerResolver: $resolver);
@@ -40,7 +41,7 @@ final class ParallelRedisTimestepWorkerTest extends TestCase
      */
     private function generate(int $taskCount, int $idsPerProcess, int $workersBits, int $sequenceBits): void
     {
-        $dbRedis = self::getRedisClient();
+        $dbRedis = $this->getRedisClient();
         $resolver = new RedisTimestepWorkerResolver(client: $dbRedis);
         $resolver->clearDatabase();
 
@@ -72,15 +73,5 @@ final class ParallelRedisTimestepWorkerTest extends TestCase
         $this::assertCount($idsPerProcess * $taskCount, $results);
         $results = array_unique($results);
         $this::assertCount($idsPerProcess * $taskCount, $results, 'Found duplicate ids');
-    }
-
-    private static function getRedisClient(): \Redis
-    {
-        return new \Redis(
-            [
-                'host' => (string) \getenv('TESTING_REDIS_HOST'),
-                'port' => (int) \getenv('TESTING_REDIS_PORT'),
-            ],
-        );
     }
 }

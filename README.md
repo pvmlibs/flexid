@@ -60,7 +60,7 @@ Groups bits are the last part of ID deliberately, this way you can mix different
 scenarios (e.g. small group of workers in burst mode and large group of processes with one time generation) and still
 have unique guarantees, assuming only the same number of groups bits and different bits in that group between IDs.
 
-Timestep can vary between 1-268435456 ns, so (1 - ~268 ms), although with using microtime() resolution is up to 1000ns,
+Timestep can vary between 1-268435456 ns, (max ~268 ms), although with using microtime() resolution is up to 1000ns,
 so it won't make sense using less than 10 bits of metadata. Constant ID range and small biggest timestep allow for
 reconfiguration even when generators are already used in production - in other ID generation solutions usually once
 setup, you need to stick to initial configuration.

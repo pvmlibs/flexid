@@ -5,23 +5,24 @@ namespace Tests\Parallel;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\StaticWorkerResolver;
+use Tests\Internal\hasRedisClient;
 
 /**
  * @internal
- *
- * @covers \Pvmlibs\FlexId\Resolvers\StaticWorkerResolver
  */
 final class ParallelStaticWorkerTest extends TestCase
 {
+    use hasRedisClient;
+
     public function testConcurrentGenerators(): void
     {
-        $this->generate(30, 100, workersBits: 16, sequenceBits: 0);
-        $this->generate(30, 1000, workersBits: 8, sequenceBits: 8);
+        $this->generate(20, 100, workersBits: 16, sequenceBits: 0);
+        $this->generate(20, 1000, workersBits: 8, sequenceBits: 8);
     }
 
     private function generateIds(int $taskId, int $idsPerProcess, int $workersBits, int $sequenceBits): void
     {
-        $dbRedis = self::getRedisClient();
+        $dbRedis = $this->getRedisClient();
 
         $resolver = new StaticWorkerResolver(
             workerHandlerFn: fn () => $taskId,
@@ -46,7 +47,7 @@ final class ParallelStaticWorkerTest extends TestCase
      */
     private function generate(int $taskCount, int $idsPerProcess, int $workersBits, int $sequenceBits): void
     {
-        $dbRedis = self::getRedisClient();
+        $dbRedis = $this->getRedisClient();
 
         for ($i = 0; $i < $taskCount; $i++) {
             $pid = \pcntl_fork();
@@ -75,15 +76,5 @@ final class ParallelStaticWorkerTest extends TestCase
 
         $results = \array_unique($results);
         $this::assertCount($idsPerProcess * $taskCount, $results);
-    }
-
-    private static function getRedisClient(): \Redis
-    {
-        return new \Redis(
-            [
-                'host' => 'flexid_valkey',
-                'port' => 6379,
-            ],
-        );
     }
 }

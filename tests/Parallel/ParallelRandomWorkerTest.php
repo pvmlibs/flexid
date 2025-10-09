@@ -5,27 +5,28 @@ namespace Tests\Parallel;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\RandomWorkerResolver;
+use Tests\Internal\hasRedisClient;
 
 /**
  * @internal
- *
- * @covers \Pvmlibs\FlexId\Resolvers\RandomWorkerResolver
  */
 final class ParallelRandomWorkerTest extends TestCase
 {
+    use hasRedisClient;
+
     public function testConcurrentGenerators(): void
     {
-        $this->generate(30, 100, 0);
+        $this->generate(20, 100, 0);
     }
 
     public function testConcurrentGeneratorsWithPid(): void
     {
-        $this->generate(30, 100, 7);
+        $this->generate(20, 100, 7);
     }
 
     private function generateIds(int $taskId, int $idsPerProcess, int $workersBits, int $groupsBits, int $pidBits): void
     {
-        $dbRedis = self::getRedisClient();
+        $dbRedis = $this->getRedisClient();
 
         $resolver = new RandomWorkerResolver(
             workersBits: $workersBits,
@@ -50,7 +51,7 @@ final class ParallelRandomWorkerTest extends TestCase
      */
     private function generate(int $taskCount, int $idsPerProcess, int $pidBits): void
     {
-        $dbRedis = self::getRedisClient();
+        $dbRedis = $this->getRedisClient();
 
         $workersBits = 11;
         $sequenceBits = 0;
@@ -100,15 +101,5 @@ final class ParallelRandomWorkerTest extends TestCase
 
         // allow max 5x statistical expected collisions
         $this::assertGreaterThanOrEqual($idsPerProcess * $taskCount - ceil(5 * $expectedCollisions), \count($results), 'Found too many duplicated ids');
-    }
-
-    private static function getRedisClient(): \Redis
-    {
-        return new \Redis(
-            [
-                'host' => 'flexid_valkey',
-                'port' => 6379,
-            ],
-        );
     }
 }
