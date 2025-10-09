@@ -1,9 +1,10 @@
-## FlexId generator
+[![CI Status](https://github.com/pvmlibs/flexid/actions/workflows/tests.yml/badge.svg)](https://github.com/pvmlibs/flexid/actions)
+[![codecov](https://codecov.io/gh/pvmlibs/flexid/branch/master/graph/badge.svg?token=26GRS6RJRN)](https://codecov.io/gh/pvmlibs/flexid/branch/master)
+
+# 64bit integer ID generator for PHP
 
 High performance, long range 64-bit integer ID generator. Generate millions of unique ID/s/worker with max ID range of
 ~ 292 years with simple usage.
-
-## Background
 
 There are already known distributed, unique integer ID algorithms, like:
 
@@ -18,7 +19,7 @@ if we use e.g. part of machine IP and 16 bits, there can be still many threads o
 So usually in implementations, workers bits are filled randomly and some unique constraint is applied on sequence. But
 this requires some central source of truth with every ID generation. This is especially costly on burst ID generation.
 
-FlexId tries to mix long-range ID with performant ID generation, also in burst scenario.
+FlexId tries to mix long-range ID with performant ID generation, also in burst scenario by managing workers.
 
 ## ID structure
 
@@ -67,10 +68,10 @@ setup, you need to stick to initial configuration.
 
 ## Implementation
 
-There is two main concepts:
+There are two main concepts:
 
-1. Resolver - provide worker id and ID configuration.
-2. Generator - generates ID using resolver. Manages requesting workers and creates sequence part.
+1. Resolver - provides worker id and ID configuration.
+2. Generator - generates ID using resolver. Manages requesting workers and creates sequence with group part.
    Generator should be used as singleton in application for performance and to assure proper time monotonicity. You can
    also define a fallback to other generator if it can't resolve worker id.
 
@@ -125,7 +126,7 @@ Available resolvers:
    burst (except sequenceBits to some extent).
    Use case: you have own method of resolving worker ID in sane range (like < 65k) that will provide ID uniqueness.
    Can provide unique ID: yes if provided unique worker id for each concurrent generator/thread and keep
-   worker/host/container - worker id pair.
+   worker/host/container - worker id pair assignment.
 
 All above resolvers are preconfigured for most common cases and should work performant out of the box, but you can
 adjust bits for your needs. Check also code for the description of class parameters.
@@ -182,7 +183,7 @@ Keep in mind that performance in burst generation very depends on bit configurat
    autoincrement then? That's a separate topic but the biggest issue can be with revealing some information such as
    rows count if publicly disclosed or possibility to enumerate. On the other hand timestamp based id reveals date of
    creation and are also possible to enumerate (in less extend but still) so that's up to you what you can accept.
-2. **Why not Snowflake?** Snowflake is great, but sometimes can be not enough, especially when we want bigger ID life
+2. **Why not Snowflake?** Snowflake is great, but sometimes can be not enough, especially when we want longer ID life
    range. Although I've seen different implementations with the ones exceeding specification - totally custom bits with
    ID range more than 1000 years. We still need to stick to bits budget so we pay with lower count of independent
    generators or burst performance so such IDs are less universal. There is also problem with changing ID
@@ -208,7 +209,7 @@ Keep in mind that performance in burst generation very depends on bit configurat
 ## Installation
 
 ```shell
-$ composer require pvmlibs/flexid
+composer require pvmlibs/flexid
 ```
 
 ## Usage
@@ -217,7 +218,7 @@ Rules to remember:
 
 1. Use generator as singleton in application for performance and uniqueness guarantee (in StaticWorkerResolver and
    RandomWorkerResolver)
-2. When sending to javascript you need to cast id to string (js does not handle 64-bit int)
+2. When sending to javascript you need to cast id to string (JS does not handle 64-bit int)
 
 ```php
 
