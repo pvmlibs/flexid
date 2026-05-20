@@ -87,7 +87,8 @@ Parameters that should be constant through application lifetime to prevent ID ov
 - timestamp offset
 - timestamp bitshift
 - encoder parameters (if used) including used alphabet to be able to correctly decode once sent encoded ID
-- encrypter parameters (if used) including used alphabet to be able to correctly decrypt once sent encrypted ID
+- encrypter parameters (if used) including used alphabet and secret key to be able to correctly decrypt once sent
+  encrypted ID
 
 Other parameters like worker bits, sequence bits, group bits are pretty safe to manipulate in future - collision can 
 happen only within the same timestep (max 1,07s). If you want to change/have generators with different worker bits and

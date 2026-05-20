@@ -27,7 +27,7 @@ $bench = new IdStats(
 );
 
 echo $bench->presentation(info: in_array('--info', $argv), distribution: in_array('--dist', $argv));
-var_dump(memory_get_peak_usage(true) / 1024 / 1024);
+
 
 
 
