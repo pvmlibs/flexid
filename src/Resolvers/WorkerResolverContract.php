@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pvmlibs\FlexId\Resolvers;
 
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
@@ -8,7 +10,7 @@ use Pvmlibs\FlexId\VO\IdConfiguration;
 interface WorkerResolverContract
 {
     /**
-     * @param int $currentTimeUs     current unix timestamp in microseconds
+     * @param int $currentTimeUs     current unix timestamp in microseconds, includes offsets
      * @param int $currentTimestepNs current ID timestamp in nanoseconds, with offset
      *
      * @throws NoWorkerAvailableException
@@ -17,10 +19,11 @@ interface WorkerResolverContract
     public function getCurrentWorkerId(): int;
 
     /**
-     * @param int $lastIdGenTimeUs unix timestamp in microseconds of last ID gen
-     * @param int $lastTimeStepNs  last timestep of generated ID
+     * @param int $lastIdGenTimeUs unix timestamp in microseconds of last ID gen, includes offsets
+     * @param int $lastTimeStepNs  last timestep of generated ID, includes offsets
+     * @param int $nowUs           unix timestamp in microseconds, includes offsets
      */
-    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0): bool;
+    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0, int $nowUs = 0): bool;
     public function getMaxWorkerResolveTrials(): int;
 
     /**

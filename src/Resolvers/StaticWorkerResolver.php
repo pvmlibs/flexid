@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pvmlibs\FlexId\Resolvers;
 
+use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\VO\IdConfiguration;
 
@@ -21,7 +24,7 @@ class StaticWorkerResolver implements WorkerResolverContract
     /**
      * Lock resolver class instance to unique worker id to prevent multiple instances with same worker id.
      *
-     * @var array<int, bool>
+     * @var array<string, bool>
      */
     private static array $resolverLock = [];
 
@@ -35,6 +38,8 @@ class StaticWorkerResolver implements WorkerResolverContract
         public readonly int $sequenceBits = 0,
         public readonly int $groupsBits = 0,
         public readonly ?string $workerLockFilePath = '/tmp',
+        public readonly int $timestampBitshift = 0,
+        public readonly int $timestampOffset = 1735689600, // UTC 2025-01-01
     ) {
         $this->configuration = new IdConfiguration(
             workersBits: $this->workersBits,
@@ -43,8 +48,10 @@ class StaticWorkerResolver implements WorkerResolverContract
             groupId: $this->groupId,
             useNewWorkerOnSequenceOverflow: false,
             lockFilePath: $this->workerLockFilePath,
+            timestampBitshift: $this->timestampBitshift,
+            timestampOffset: $this->timestampOffset,
         );
-        $this->lockFileTemplate = '%s/flex_id_static_w%d_gen.tmp';
+        $this->lockFileTemplate = '%s/flex_id_static_w%d_tb%d_to%d_gen.tmp';
     }
 
     public function getCurrentWorkerId(): int
@@ -59,10 +66,10 @@ class StaticWorkerResolver implements WorkerResolverContract
     {
         if ($this->workerId === -1) {
             $this->workerId = ($this->workerHandlerFn)();
-            if (\array_key_exists($this->workerId, self::$resolverLock)) {
-                throw new \Exception('Incorrect use of StaticWorkerResolver - should be only one instance with the same worker id');
+            if (\array_key_exists($this->timeConfigKey(), self::$resolverLock)) {
+                throw new IdConfigurationException('Incorrect use of StaticWorkerResolver - should be only one instance with the same worker id');
             }
-            self::$resolverLock[$this->workerId] = true;
+            self::$resolverLock[$this->timeConfigKey()] = true;
 
             $this->checkSubsequentRunWithSameWorkerAndSameTimestep($currentTimeUs, $currentTimestepNs);
         }
@@ -70,10 +77,10 @@ class StaticWorkerResolver implements WorkerResolverContract
         return $this->workerId;
     }
 
-    public function releaseWorker(?int $lastIdGenTimeUs = null, ?int $lastTimeStepNs = null): bool
+    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0, int $nowUs = 0): bool
     {
         if ($this->workerId !== -1 && $this->configuration->lockFilePath !== null) {
-            $fileName = \sprintf($this->lockFileTemplate, $this->configuration->lockFilePath, $this->workerId);
+            $fileName = $this->getLockFileName($this->workerId);
 
             file_put_contents(
                 $fileName,
@@ -90,7 +97,7 @@ class StaticWorkerResolver implements WorkerResolverContract
     public function __destruct()
     {
         if ($this->workerId !== -1) {
-            unset(self::$resolverLock[$this->workerId]);
+            unset(self::$resolverLock[$this->timeConfigKey()]);
         }
     }
 
@@ -124,9 +131,8 @@ class StaticWorkerResolver implements WorkerResolverContract
      */
     private function checkSubsequentRunWithSameWorkerAndSameTimestep(int $currentTimeUs, int $currentTimestepNs): void
     {
-        $fileName = \sprintf($this->lockFileTemplate, $this->configuration->lockFilePath, $this->workerId);
+        $fileName = $this->getLockFileName($this->workerId);
         $lastGenDataJson = @\file_get_contents($fileName);
-
         if ($lastGenDataJson !== false) {
             $lastGenData = \json_decode($lastGenDataJson, true);
             $lastTimeStepNs = (int) ($lastGenData['lastTimestepNs'] ?? 0);
@@ -160,9 +166,19 @@ class StaticWorkerResolver implements WorkerResolverContract
             $workerId = $this->workerId;
         }
 
-        $fileName = \sprintf($this->lockFileTemplate, $this->configuration->lockFilePath, $workerId);
+        $fileName = $this->getLockFileName($workerId);
         if (\file_exists($fileName)) {
             \unlink($fileName);
         }
+    }
+
+    private function getLockFileName(int $workerId): string
+    {
+        return \sprintf($this->lockFileTemplate, $this->configuration->lockFilePath, $workerId, $this->timestampBitshift, $this->timestampOffset);
+    }
+
+    private function timeConfigKey(): string
+    {
+        return $this->workerId . '-' . $this->timestampBitshift . '-' . $this->timestampOffset;
     }
 }

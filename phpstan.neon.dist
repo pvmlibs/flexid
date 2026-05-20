@@ -17,6 +17,7 @@ parameters:
     checkMissingCallableSignature: true
     checkTooWideReturnTypesInProtectedAndPublicMethods: true
     checkBenevolentUnionTypes: true
+    reportUnmatchedIgnoredErrors: false
     paths:
         - src
         - tests

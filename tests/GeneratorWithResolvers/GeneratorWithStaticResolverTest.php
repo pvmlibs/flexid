@@ -1,6 +1,8 @@
 <?php
 
-namespace Tests;
+declare(strict_types=1);
+
+namespace Tests\GeneratorWithResolvers;
 
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;
@@ -43,6 +45,19 @@ final class GeneratorWithStaticResolverTest extends TestCase
         for ($i = 0; $i < $total; $i++) {
             $resolver = new StaticWorkerResolver(workerHandlerFn: fn () => $workerId, workersBits: 20);
             $generator = new FlexIdGenerator(workerResolver: $resolver);
+            $ids[] = $generator->id();
+        }
+
+        $this::assertCount($total, \array_unique($ids));
+    }
+
+    public function testGenerateShort(): void
+    {
+        $resolver = new StaticWorkerResolver(workerHandlerFn: fn () => 1, workersBits: 8, sequenceBits: 4, timestampBitshift: 16); // 64 id/s
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+        $total = 10;
+        $ids = [];
+        for ($i = 0; $i < $total; $i++) {
             $ids[] = $generator->id();
         }
 

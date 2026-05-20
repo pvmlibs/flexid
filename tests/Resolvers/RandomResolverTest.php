@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Resolvers;
 
 use PHPUnit\Framework\TestCase;
@@ -90,9 +92,9 @@ final class RandomResolverTest extends TestCase
         $resolver = new RandomWorkerResolver(workersBits: $workersBits, groupsBits: $groupsBits);
         $this::assertTrue($resolver->dependsOnTimestamp());
         $this::assertSame(2, $resolver->getMaxWorkerResolveTrials());
-        $this::assertSame($resolver->getConfiguration()->workersBits, $workersBits);
-        $this::assertSame($resolver->getConfiguration()->sequenceBits, 0);
-        $this::assertSame($resolver->getConfiguration()->groupsBits, $groupsBits);
-        $this::assertSame($resolver->getConfiguration()->groupId, 0);
+        $this::assertSame($workersBits, $resolver->getConfiguration()->workersBits);
+        $this::assertSame(0, $resolver->getConfiguration()->sequenceBits);
+        $this::assertSame($groupsBits, $resolver->getConfiguration()->groupsBits);
+        $this::assertSame(0, $resolver->getConfiguration()->groupId);
     }
 }

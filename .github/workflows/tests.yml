@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         operating-system: [ 'ubuntu-latest' ]
-        php-versions: [ '8.2', '8.3', '8.4' ]
+        php-versions: [ '8.2', '8.3', '8.4', '8.5' ]
     services:
       redis:
         image: redis
@@ -32,7 +32,8 @@ jobs:
           php-version: ${{ matrix.php-versions }}
           tools: composer:v2
           coverage: none
-          extensions: redis, pcntlc
+          extensions: redis, pcntl, apcu, bcmath
+          ini-values: apc.enabled=1, apc.enable_cli=1
 
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress

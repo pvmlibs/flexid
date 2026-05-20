@@ -54,6 +54,7 @@ return $config
         'use_arrow_functions' => true,
         'void_return' => true,
         'php_unit_test_class_requires_covers' => false,
+        'declare_strict_types' => ['strategy' => 'enforce'],
     ])
     ->setFinder(
         Finder::create()

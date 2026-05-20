@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pvmlibs\FlexId\Resolvers;
 
 use Predis\Client as PredisClient;
 use Predis\Connection\ConnectionException;
+use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\VO\IdConfiguration;
 
@@ -32,20 +35,23 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
     /**
      * @var \Closure(string, int, array<int|string>): mixed
      */
-    private \Closure $redisEval;
+    protected \Closure $redisEval;
 
-    private int $separationMs = 0;
+    protected int $separationMs = 0;
+    protected int $timestampOffsetUs;
+    protected int $luaTimestampOffsetUs;
+    protected int $separationUs;
 
     /**
      * Redis/Valkey uses Lua 5.1 which does not fully support int 64bit.
      * Numbers are handled as doubles and int precision can be retained to 2 ** 53 (similar to JS).
      * So we offset by this number, which gives us range ~ -285 to +285 years, so ~570 years from $timestampOffsetUs.
      */
-    private const LUA_INT_OFFSET = 9007199254740992; // 2 ** 53
+    protected const LUA_INT_OFFSET = 9007199254740992; // 2 ** 53
 
-    private string $prefix = '_flexid_rw:';
+    protected string $prefix = '_flexid_rw:';
 
-    private readonly IdConfiguration $configuration;
+    protected IdConfiguration $configuration;
 
     /**
      * @param \Redis|PredisClient $client                    Redis client, for best performance Redis is preferred (ext-redis)
@@ -57,7 +63,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
      *                                                       The same worker will try to use the same id to improve pool availability.
      *                                                       Higher value will lower theoretical throughput of worker reservations per second.
      * @param int                 $resolveWorkerTrials       How many tries to allow if there are no worker/database available. With no worker available, next try will wait until lowest TTL slot.
-     * @param int                 $timestampOffsetUs         timestamp offset used to extend Redis int number handling, this is used in addition to LUA_INT_OFFSET but can be set by user
+     * @param int                 $timestampOffset           timestamp offset used to extend Redis int number handling, this is used in addition to LUA_INT_OFFSET but can be set by user
      *                                                       Once set, don't change it later, or you will need to perform clearDatabase()
      *
      * @throws \Exception
@@ -72,11 +78,21 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
         public readonly int $TTLMs = 10000,
         public readonly int $minimalWorkerSeparationMs = 50,
         public readonly int $resolveWorkerTrials = 1,
-        public readonly int $timestampOffsetUs = 1735689600000000, // UTC 2025-01-01
+        public readonly int $timestampOffset = 1735689600, // UTC 2025-01-01
+        public readonly int $timestampBitshift = 0,
     ) {
-        if ($this->timestampOffsetUs < 0) {
-            throw new \Exception('Timestamp offset must be >= 0');
-        }
+        $this->configuration = new IdConfiguration(
+            workersBits: $this->workersBits,
+            sequenceBits: $this->sequenceBits,
+            groupsBits: $this->groupsBits,
+            groupId: $this->groupId,
+            useNewWorkerOnSequenceOverflow: $this->useNewWorkerOnSequenceOverflow,
+            timestampBitshift: $this->timestampBitshift,
+            timestampOffset: $this->timestampOffset,
+        );
+
+        $this->timestampOffsetUs = ($this->timestampOffset * 1_000_000) >> $this->timestampBitshift;
+        $this->luaTimestampOffsetUs = self::LUA_INT_OFFSET >> $this->timestampBitshift;
 
         $this->redisEval = match ($client::class) {
             \Redis::class => fn (string $script, int $keysNum, array $argsAndKeys) => $this->client->eval($script, $argsAndKeys, $keysNum),
@@ -85,26 +101,18 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                 $keysNum,
                 ...$argsAndKeys, // @phpstan-ignore argument.named
             ),
-            default => throw new \Exception('Client not supported'),
+            default => throw new IdConfigurationException('Client not supported'),
         };
-
-        $this->configuration = new IdConfiguration(
-            workersBits: $this->workersBits,
-            sequenceBits: $this->sequenceBits,
-            groupsBits: $this->groupsBits,
-            groupId: $this->groupId,
-            useNewWorkerOnSequenceOverflow: $this->useNewWorkerOnSequenceOverflow,
-        );
 
         $this->setPrefix($this->prefix);
 
         $timeStepMs = (int) \ceil($this->configuration->timestepNs / 1e6);
 
-        $this->separationMs = \max(
+        $this->separationMs = max(
             $this->minimalWorkerSeparationMs,
-            (int) \ceil($this->TTLMs * 0.005),
             2 * $timeStepMs,
         );
+        $this->separationUs = ($this->separationMs * 1_000) >> $this->timestampBitshift;
     }
 
     public function getTTLms(): int
@@ -122,11 +130,11 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
      */
     public function resolveWorkerId(int $currentTimeUs, int $currentTimestepNs): int
     {
-        $currentTimeUs -= ($this->timestampOffsetUs + self::LUA_INT_OFFSET);
-        $newTimeoutUs = ($currentTimeUs + (1_000 * $this->TTLMs));
+        $currentTimeUs -= $this->luaTimestampOffsetUs;
+        $newTimeoutUs = ($currentTimeUs + (1_000 * $this->TTLMs >> $this->timestampBitshift));
 
-        if ($currentTimeUs < -self::LUA_INT_OFFSET) {
-            throw new \Exception('Redis timestamp offset must be represent past UNIX date in microseconds');
+        if ($currentTimeUs < -$this->luaTimestampOffsetUs) {
+            throw new IdConfigurationException('Redis timestamp offset must be represent past UNIX date in microseconds');
         }
 
         /* @var false|list<int> $result */
@@ -153,12 +161,12 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                         end
                     end
                     
-                    local currentTimeUs = tonumber(ARGV[2])     
+                    local currentTimeUs = tonumber(ARGV[2])
                     local lockUntilUs = tonumber(redis.call('get', lockKey) or lowestTimestampUs)
                     
                     -- prevent excessive worker search if all are busy
                     if lockUntilUs > currentTimeUs then
-                        return {-1, lockUntilUs - currentTimeUs}
+                        return {-1, lockUntilUs - currentTimeUs, 1}
                     end
                     
                     local maxWorkers = tonumber(ARGV[1])
@@ -172,7 +180,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                     while trials <= maxWorkers do
                         workerTimeoutUs = tonumber(redis.call('hget', workerSlotsKey, workerId) or lowestTimestampUs)
                             
-                        if currentTimeUs > workerTimeoutUs + workerSeparationUs then
+                        if currentTimeUs >= workerTimeoutUs + workerSeparationUs then
                             redis.call('hset', workerSlotsKey, workerId, newWorkerTimeoutUs)
                             redis.call('set', nextWorkerIdKey, workerId + 1)
                             return {workerId, trials}
@@ -188,9 +196,9 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                         trials = trials + 1
                     end
                     
-                    redis.call('set', lockKey, minTimeout + workerSeparationUs + 1)
+                    redis.call('set', lockKey, minTimeout + workerSeparationUs)
                     redis.call('set', nextWorkerIdKey, minTimeoutWorker)
-                    return {-1, workerTimeoutUs + workerSeparationUs - currentTimeUs}
+                    return {-1, minTimeout + workerSeparationUs - currentTimeUs, 2, trials}
                 LUA, 3, [
                 $this->nextWorkerIdKey, // KEYS1
                 $this->workersKey,      // KEYS2
@@ -198,8 +206,8 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                 $this->configuration->maxWorkers,      // ARGV1
                 $currentTimeUs,         // ARGV2
                 $newTimeoutUs,          // ARGV3
-                $this->separationMs * 1_000,    // ARGV4
-                -self::LUA_INT_OFFSET,          // ARGV5
+                $this->separationUs,    // ARGV4
+                -$this->luaTimestampOffsetUs,          // ARGV5
                 $this->workerId,      // ARGV6
                 $this->lastTimeoutUs, // ARGV7
             ]);
@@ -212,8 +220,8 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
             throw new NoWorkerAvailableException(maxWorkers: $this->configuration->maxWorkers, groupId: $this->groupId, previous: new \Exception('Error in worker script'));
         }
 
-        if ((int) $result[0] === -1) {
-            throw new NoWorkerAvailableException(maxWorkers: $this->configuration->maxWorkers, groupId: $this->groupId, lockTimeUs: $result[1]);
+        if ($result[0] === -1) {
+            throw new NoWorkerAvailableException(maxWorkers: $this->configuration->maxWorkers, groupId: $this->groupId, lockTimeUs: ((int) $result[1]) << $this->timestampBitshift);
         }
 
         $this->lastTimeoutUs = $newTimeoutUs;
@@ -222,13 +230,17 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
         return $this->workerId;
     }
 
-    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0): bool
+    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0, int $nowUs = 0): bool
     {
         if ($this->workerId === -1) {
             return false;
         }
 
-        $nowUs = ((int) (\microtime(true) * 1_000_000)) - ($this->timestampOffsetUs + self::LUA_INT_OFFSET);
+        if ($nowUs === 0) {
+            $nowUs = (((int) (\microtime(true) * 1_000_000)) >> $this->timestampBitshift) - ($this->timestampOffsetUs + $this->luaTimestampOffsetUs);
+        } else {
+            $nowUs -= $this->luaTimestampOffsetUs;
+        }
 
         // when worker TTL has expired don't release it in DB
         if ($nowUs >= $this->lastTimeoutUs) {
@@ -238,7 +250,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
         }
 
         if ($lastIdGenTimeUs !== 0) {
-            $newTimeoutUs = $lastIdGenTimeUs - ($this->timestampOffsetUs + self::LUA_INT_OFFSET);
+            $newTimeoutUs = $lastIdGenTimeUs - $this->luaTimestampOffsetUs;
         } else {
             $newTimeoutUs = $nowUs;
         }
@@ -248,7 +260,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                     local workerId = ARGV[3]
                     local lastWorkerStartTimeoutUs = ARGV[1]
                     local newWorkerTimeout = ARGV[2]
-                    
+
                     -- need to verify we still hold this worker
                     if redis.call('hget', KEYS[1], workerId) == lastWorkerStartTimeoutUs then
                         return redis.call('hset', KEYS[1], workerId, newWorkerTimeout)
@@ -282,7 +294,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
      */
     public function getCurrentlyUsedWorkers(int $timeOffsetMs = 0): array
     {
-        $now = ((int) (\microtime(true) * 1_000_000)) - ($this->timestampOffsetUs + self::LUA_INT_OFFSET);
+        $now = (((int) (\microtime(true) * 1_000_000)) >> $this->timestampBitshift) - ($this->timestampOffsetUs + $this->luaTimestampOffsetUs);
 
         /** @var false|list<int|false|null> $slotsUsedNum */
         $slotsUsedNum = ($this->redisEval)(
@@ -303,7 +315,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                             local workerTimeoutUs = tonumber(result[2][i])
                             if workerTimeoutUs >= (timestampRefUs + timeOffsetUs) then
                                 count = count + 1
-                            end                           
+                            end
                         end
                     until cursor == "0"
                     
@@ -314,8 +326,8 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                 $this->workersKey,    // KEYS1
                 $this->lockKey,       // KEYS2
                 $this->nextWorkerIdKey,   // KEYS3
-                $now - (1_000 * $this->separationMs), // ARGV1
-                1_000 * $timeOffsetMs,   // ARGV2
+                $now - $this->separationUs, // ARGV1
+                (1_000 * $timeOffsetMs) >> $this->timestampBitshift,   // ARGV2
             ]
         );
 
@@ -324,7 +336,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
         }
 
         if ($slotsUsedNum[1] !== null && $slotsUsedNum[1] !== false) {
-            $lockDate = $slotsUsedNum[1] + self::LUA_INT_OFFSET + $this->timestampOffsetUs;
+            $lockDate = $slotsUsedNum[1] + $this->timestampOffsetUs + $this->luaTimestampOffsetUs;
             $lockDateSeconds = $lockDate / 1e6;
             $lockDateSecondsInt = \floor($lockDateSeconds);
             $lockDateMicroseconds = round($lockDateSeconds - $lockDateSecondsInt, 6);
@@ -341,9 +353,10 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
         ];
     }
 
-    private function setPrefix(string $prefix): void
+    protected function setPrefix(string $prefix): void
     {
-        $this->prefix = $prefix;
+        // concurrent workers with different time configurations must have separate keys
+        $this->prefix = $prefix . "{$this->timestampBitshift}:{$this->timestampOffset}:";
         $this->workersKey = $this->prefix . 'workers:' . $this->groupId . ':';
         $this->nextWorkerIdKey = $this->prefix . 'next_id:' . $this->groupId . ':';
         $this->lockKey = $this->prefix . 'lock:' . $this->groupId . ':';
@@ -379,7 +392,7 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
      */
     public function removeExpiredWorkers(): void
     {
-        $now = ((int) (\microtime(true) * 1_000_000)) - ($this->timestampOffsetUs + self::LUA_INT_OFFSET);
+        $now = (((int) (\microtime(true) * 1_000_000)) >> $this->timestampBitshift) - ($this->timestampOffsetUs + $this->luaTimestampOffsetUs);
 
         ($this->redisEval)(
             <<<'LUA'
@@ -396,14 +409,14 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
                             local workerTimeoutUs = tonumber(result[2][i])
                             if workerTimeoutUs < timestampRefUs then
                                 redis.call('hdel', KEYS[1], result[2][i-1])
-                            end                                
+                            end
                         end
                     until cursor == "0"
                 LUA,
             1,
             [
                 $this->workersKey,
-                $now - (1_000 * $this->separationMs), // ARGV1
+                $now - $this->separationUs, // ARGV1
             ]
         );
     }
@@ -441,5 +454,20 @@ class RedisReservedWorkerResolver implements WorkerResolverContract, WorkerResol
     public function getWorkerSeparationMs(): int
     {
         return $this->separationMs;
+    }
+
+    public function getLastTimeoutUs(): int
+    {
+        return $this->lastTimeoutUs;
+    }
+
+    public function getSeparationUs(): int
+    {
+        return $this->separationUs;
+    }
+
+    public function getTimestampOffsetUs(): int
+    {
+        return $this->timestampOffsetUs;
     }
 }

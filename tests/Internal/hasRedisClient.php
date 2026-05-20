@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Internal;
 
 use Predis\Client;
@@ -12,8 +14,8 @@ trait hasRedisClient
             [
                 'host' => (string) \getenv('TESTING_REDIS_HOST'),
                 'port' => (int) \getenv('TESTING_REDIS_PORT'),
-                'connectTimeout' => 2,
-                'readTimeout' => 2,
+                'connectTimeout' => 1,
+                'readTimeout' => 1,
             ],
         );
     }
@@ -24,8 +26,8 @@ trait hasRedisClient
             [
                 'host' => (string) \getenv('TESTING_REDIS_HOST'),
                 'port' => (int) \getenv('TESTING_REDIS_PORT'),
-                'timeout' => 2,
-                'read_write_timeout' => 2,
+                'timeout' => 1,
+                'read_write_timeout' => 1,
             ],
         );
     }
@@ -36,8 +38,8 @@ trait hasRedisClient
             [
                 'host' => (string) \getenv('TESTING_REDIS_HOST'),
                 'port' => 1111,
-                'connectTimeout' => 2,
-                'readTimeout' => 2,
+                'connectTimeout' => 1,
+                'readTimeout' => 1,
             ],
         );
     }

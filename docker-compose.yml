@@ -66,3 +66,19 @@ services:
     environment:
       TESTING_REDIS_HOST: 'flexid_valkey'
       TESTING_REDIS_PORT: 6379
+
+  php85:
+    container_name: flexid_php85
+    build:
+      dockerfile: Dockerfile_alpine3_23
+      no_cache: true
+      args:
+        PHP_VERSION: 85
+    volumes:
+      - ./:/var/www/
+    tty: true
+    depends_on:
+      - valkey
+    environment:
+      TESTING_REDIS_HOST: 'flexid_valkey'
+      TESTING_REDIS_PORT: 6379

@@ -1,9 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pvmlibs\FlexId\Exceptions;
 
 final class NoWorkerAvailableException extends \RuntimeException
 {
+    /**
+     * @param int $lockTimeUs This must be in real us, when using timestampBitshift make sure you shifted it
+     */
     public function __construct(
         public readonly int $maxWorkers,
         public readonly int $groupId,

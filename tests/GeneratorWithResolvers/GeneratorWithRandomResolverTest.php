@@ -1,6 +1,8 @@
 <?php
 
-namespace Tests;
+declare(strict_types=1);
+
+namespace Tests\GeneratorWithResolvers;
 
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;

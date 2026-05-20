@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Resolvers;
 
 use PHPUnit\Framework\TestCase;
 use Predis\Client;
+use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\Resolvers\RedisReservedWorkerResolver;
 use Tests\Internal\hasRedisClient;
@@ -43,16 +46,16 @@ final class RedisReservedWorkerResolverTest extends TestCase
 
     public function testResolveWorkerWrongCurrentTimeRedis(): void
     {
-        // current time must be > timestampOffsetUs
+        // current relative time must be >= 0
         $resolver = new RedisReservedWorkerResolver(client: $this->getRedisClient());
-        $this->expectException(\Exception::class);
-        $resolver->resolveWorkerId($resolver->timestampOffsetUs - 1, 1000);
+        $this->expectException(IdConfigurationException::class);
+        $resolver->resolveWorkerId(-1, 1000);
     }
 
     public function testNegativeTimestampOffset(): void
     {
         $this->expectException(\Exception::class);
-        new RedisReservedWorkerResolver(client: $this->getRedisClient(), timestampOffsetUs: -1);
+        new RedisReservedWorkerResolver(client: $this->getRedisClient(), timestampOffset: -1);
     }
 
     public function testResolveWorkerOnNonReachableRedis(): void
@@ -70,7 +73,7 @@ final class RedisReservedWorkerResolverTest extends TestCase
         $workerSeparationMs = $resolver->getWorkerSeparationMs();
         $resolver->clearDatabase();
 
-        $timestamp = (int) (\microtime(true) * 1_000_000);
+        $timestamp = ((int) (\microtime(true) * 1_000_000)) - $resolver->getTimestampOffsetUs();
         $nanoTime = $timestamp * 1_000;
 
         $resolver->resolveWorkerId($timestamp, $nanoTime);
@@ -115,7 +118,7 @@ final class RedisReservedWorkerResolverTest extends TestCase
         $resolver = new RedisReservedWorkerResolver(client: $redisClient, workersBits: 1, TTLMs: $timeoutMs, minimalWorkerSeparationMs: 1);
         $workerSeparationMs = $resolver->getWorkerSeparationMs();
 
-        $timestampUs = (int) (\microtime(true) * 1_000_000);
+        $timestampUs = (int) (\microtime(true) * 1_000_000) - $resolver->getTimestampOffsetUs();
         $nanoTime = $timestampUs * 1_000;
         $resolver->clearDatabase();
 
@@ -133,7 +136,7 @@ final class RedisReservedWorkerResolverTest extends TestCase
         $this::assertSame(1, $workerId3);
 
         // reached max reserved workers, calculate new timestamp
-        $timestampUs = (int) (\microtime(true) * 1_000_000) + 1_000 * ($timeoutMs + $workerSeparationMs);
+        $timestampUs = (int) (\microtime(true) * 1_000_000) - $resolver->getTimestampOffsetUs() + 1_000 * ($timeoutMs + $workerSeparationMs);
         $resolver->releaseWorker();
 
         $workerId1 = $resolver->resolveWorkerId($timestampUs, $nanoTime);
@@ -154,7 +157,7 @@ final class RedisReservedWorkerResolverTest extends TestCase
         $resolver = new RedisReservedWorkerResolver(client: $redisClient, workersBits: 1, TTLMs: $timeoutMs, minimalWorkerSeparationMs: 10);
         $resolver->clearDatabase();
 
-        $timestampUs = (int) (\microtime(true) * 1_000_000);
+        $timestampUs = (int) (\microtime(true) * 1_000_000) - $resolver->getTimestampOffsetUs();
         $nanoTime = $timestampUs * 1_000;
 
         $workerId1 = $resolver->resolveWorkerId($timestampUs, $nanoTime);
@@ -234,10 +237,10 @@ final class RedisReservedWorkerResolverTest extends TestCase
         $resolver = new RedisReservedWorkerResolver(client: $this->getRedisClient(), workersBits: $workersBits, sequenceBits: $sequenceBits, groupsBits: $groupsBits);
         $this::assertFalse($resolver->dependsOnTimestamp());
         $this::assertSame(1, $resolver->getMaxWorkerResolveTrials());
-        $this::assertSame($resolver->getConfiguration()->workersBits, $workersBits);
-        $this::assertSame($resolver->getConfiguration()->sequenceBits, $sequenceBits);
-        $this::assertSame($resolver->getConfiguration()->groupsBits, $groupsBits);
-        $this::assertSame($resolver->getConfiguration()->groupId, 0);
+        $this::assertSame($workersBits, $resolver->getConfiguration()->workersBits);
+        $this::assertSame($sequenceBits, $resolver->getConfiguration()->sequenceBits);
+        $this::assertSame($groupsBits, $resolver->getConfiguration()->groupsBits);
+        $this::assertSame(0, $resolver->getConfiguration()->groupId);
     }
 
     public function testReleaseWorker(): void
@@ -245,7 +248,7 @@ final class RedisReservedWorkerResolverTest extends TestCase
         $resolver = new RedisReservedWorkerResolver(client: $this->getRedisClient());
         $resolver->clearDatabase();
 
-        $currentTime = (int) (\microtime(true) * 1_000_000);
+        $currentTime = (int) (\microtime(true) * 1_000_000) - $resolver->getTimestampOffsetUs();
         $nanoTime = $currentTime * 1_000;
 
         $resolver->resolveWorkerId($currentTime, $nanoTime);

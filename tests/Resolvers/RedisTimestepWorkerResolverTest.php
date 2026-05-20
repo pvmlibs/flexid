@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Resolvers;
 
 use PHPUnit\Framework\TestCase;
@@ -97,11 +99,11 @@ final class RedisTimestepWorkerResolverTest extends TestCase
         $resolver = new RedisTimestepWorkerResolver(client: $this->getRedisClient(), workersBits: $workersBits, sequenceBits: $sequenceBits, groupsBits: $groupsBits);
         $this::assertTrue($resolver->dependsOnTimestamp());
         $this::assertSame(2, $resolver->getMaxWorkerResolveTrials());
-        $this::assertSame($resolver->getConfiguration()->workersBits, $workersBits);
-        $this::assertSame($resolver->getConfiguration()->sequenceBits, $sequenceBits);
-        $this::assertSame($resolver->getConfiguration()->groupsBits, $groupsBits);
-        $this::assertSame($resolver->getConfiguration()->groupId, 0);
-        $this::assertSame($resolver->getConfiguration()->maxWorkers, 1 << $workersBits);
-        $this::assertSame($resolver->getConfiguration()->maxSequence, 1 << $sequenceBits);
+        $this::assertSame($workersBits, $resolver->getConfiguration()->workersBits);
+        $this::assertSame($sequenceBits, $resolver->getConfiguration()->sequenceBits);
+        $this::assertSame($groupsBits, $resolver->getConfiguration()->groupsBits);
+        $this::assertSame(0, $resolver->getConfiguration()->groupId);
+        $this::assertSame(1 << $workersBits, $resolver->getConfiguration()->maxWorkers);
+        $this::assertSame(1 << $sequenceBits, $resolver->getConfiguration()->maxSequence);
     }
 }

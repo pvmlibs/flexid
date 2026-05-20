@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
@@ -55,9 +57,22 @@ final class IdConfigurationTest extends TestCase
         new IdConfiguration(
             workersBits: 10,
             sequenceBits: 10,
-            groupsBits: 10,
+            groupsBits: 12,
             groupId: 0,
             useNewWorkerOnSequenceOverflow: false,
+        );
+    }
+
+    public function testTooLowTimestampBitshift(): void
+    {
+        $this->expectException(IdConfigurationException::class);
+        new IdConfiguration(
+            workersBits: 10,
+            sequenceBits: 10,
+            groupsBits: 0,
+            groupId: 0,
+            useNewWorkerOnSequenceOverflow: false,
+            timestampBitshift: -1,
         );
     }
 

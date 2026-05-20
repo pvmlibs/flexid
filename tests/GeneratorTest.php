@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
+use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
+use Pvmlibs\FlexId\Exceptions\IdGeneratorException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Tests\Internal\TestingWorkerResolver;
@@ -45,7 +49,7 @@ final class GeneratorTest extends TestCase
         $metadataMask = -1 << ($workerBits + $groupBits + $sequenceBits);
         for ($i = 0; $i < 1000; $i++) {
             $id = $generator->id();
-            $timestamp = $id & $metadataMask;
+            $timestamp = intdiv($id & $metadataMask, 1_000) << $resolver->getConfiguration()->timestampBitshift;
             $this::assertSame($timestamp, $generator->getTimestampFromId($id));
             $this::assertGreaterThanOrEqual($lastTimestamp, $timestamp);
             $lastTimestamp = $timestamp;
@@ -89,8 +93,9 @@ final class GeneratorTest extends TestCase
         $timestamp3 = $id3 & $mask;
 
         $this::assertNotSame($id2, $id3);
-        // timestamp diff must not exceed timeout
-        $this::assertSame($timestamp2 + $generator->resolverIdConfiguration->timestepNs, $timestamp3);
+        // when exceed timeout it should be timestamp + timestepNs but if id was generated in next timestep relative
+        // to id2 then it will be timestamp + 2 * timestepNs
+        $this::assertLessThanOrEqual(2 * $generator->resolverIdConfiguration->timestepNs, $timestamp3 - $timestamp2);
     }
 
     public function testFallbackResolver(): void
@@ -203,12 +208,25 @@ final class GeneratorTest extends TestCase
         // diff should be below 1ms (1e6 nanoseconds)
         $this::assertTrue(\abs($id - $generator->fromDate($date)) < 1e6);
 
+        // test with time bit shift
+        $resolver = new TestingWorkerResolver(workerTimeoutMs: 70, workersBits: 10, sequenceBits: 0, timestampBitshift: 16);
+        $resolver->setWorker(fn () => 5);
+
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+        $id = $generator->id();
+        $date = $generator->toDate($id);
+        $this::assertSame(0, $date->diff(new \DateTime(), true)->s);
+
+        // diff should be below 1ms (1e6 nanoseconds)
+        $maxDiff = $generator->resolverIdConfiguration->timestepNs >> $generator->resolverIdConfiguration->timestampBitshift;
+        $this::assertTrue(\abs($id - $generator->fromDate($date)) < 3 * $maxDiff);
+
         // negative numbers should throw exception
         $this->expectException(\Exception::class);
         $generator->toDate(-123456);
     }
 
-    public function testBulkIdGenerate(): void
+    public function testBulkIdGenerateDefaultBitshift(): void
     {
         $resolver = new TestingWorkerResolver(
             groupId: 3,
@@ -228,6 +246,29 @@ final class GeneratorTest extends TestCase
         $this::assertCount($total, \array_unique($ids));
     }
 
+    public function testBulkIdGenerateWithBitshift(): void
+    {
+        $resolver = new TestingWorkerResolver(
+            workerTimeoutMs: 150,
+            groupId: 1,
+            workersBits: 2,
+            groupsBits: 1,
+            timestampBitshift: 16,
+        );
+        $resolver->setWorker(fn () => 2);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+
+        $total = (1 << $resolver->getConfiguration()->sequenceBits) + 10;
+        $ids = $generator->bulkIds($total);
+
+        foreach ($ids as $id) {
+            $this::assertSame(2, $generator->getWorkerIdFromId($id));
+            $this::assertSame(1, $generator->getGroupIdFromId($id));
+        }
+
+        $this::assertCount($total, \array_unique($ids));
+    }
+
     public function testInfo(): void
     {
         $resolver = new TestingWorkerResolver();
@@ -238,53 +279,27 @@ final class GeneratorTest extends TestCase
         $this::assertNotEmpty($info);
     }
 
-    public function testGetOffsetFromSnowflake(): void
-    {
-        $snowflakeBaseDate = '2020-08-01 01:01:01';
-        $snowflakeId = (\time() - \strtotime($snowflakeBaseDate)) * 1000 << 22; // 10 bits workers + 12 bits sequence
-
-        $offset = FlexIdGenerator::getOffsetFromSnowflakeId($snowflakeId);
-
-        $resolver = new TestingWorkerResolver();
-        $resolver->setWorker(fn () => 5);
-        $generator = new FlexIdGenerator(workerResolver: $resolver, timestampOffset: $offset);
-        $id = $generator->id();
-
-        $this::assertLessThan(2e9, $id - $snowflakeId); // up to 2sec diff, id always bigger
-        $this::assertGreaterThan(0, $id - $snowflakeId);
-
-        $secInFuture = 1000;
-        $offset = FlexIdGenerator::getOffsetFromSnowflakeId($snowflakeId, $secInFuture);
-        $generator = new FlexIdGenerator(workerResolver: $resolver, timestampOffset: $offset);
-
-        $snowflakeId = ((\time() + $secInFuture) - \strtotime($snowflakeBaseDate)) * 1000 << 22;
-        $id2 = $generator->id() + (int) ($secInFuture * 1e9);
-
-        $this::assertLessThan(2e9, $id2 - $snowflakeId); // up to 2sec diff, id always bigger
-        $this::assertGreaterThan(0, $id2 - $snowflakeId);
-    }
-
     public function testNegativeTimeOffset(): void
     {
-        $resolver = new TestingWorkerResolver();
+        $resolver = new TestingWorkerResolver(timestampOffset: -1);
         $resolver->setWorker(fn () => 5);
-        $this->expectException(\DomainException::class);
-        new FlexIdGenerator(workerResolver: $resolver, timestampOffset: -1);
+        $this->expectException(IdConfigurationException::class);
+        new FlexIdGenerator(workerResolver: $resolver);
     }
 
     public function testFutureTimeOffset(): void
     {
-        $resolver = new TestingWorkerResolver();
+        $resolver = new TestingWorkerResolver(timestampOffset: \time() + 1);
         $resolver->setWorker(fn () => 5);
-        $generator = new FlexIdGenerator(workerResolver: $resolver, timestampOffset: \time() + 1);
-        $this->expectException(\DomainException::class);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+        $this->expectException(IdGeneratorException::class);
         $generator->id();
     }
 
     public function testIncompatibleWorkersConfiguration(): void
     {
         $resolver = new TestingWorkerResolver(workersBits: 0, useNewWorkerOnSequenceOverflow: true);
-        $this->expectException(\DomainException::class);
+        $this->expectException(IdConfigurationException::class);
         new FlexIdGenerator(workerResolver: $resolver);
     }
 
@@ -292,7 +307,7 @@ final class GeneratorTest extends TestCase
     {
         $resolver = new TestingWorkerResolver(workerTimeoutMs: 1, workersBits: 10, sequenceBits: 10);
         $resolver->setWorker(fn () => 5);
-        $this->expectException(\DomainException::class);
+        $this->expectException(IdConfigurationException::class);
         new FlexIdGenerator(workerResolver: $resolver);
     }
 
@@ -301,7 +316,7 @@ final class GeneratorTest extends TestCase
         $resolver = new TestingWorkerResolver(workerTimeoutMs: 5, workersBits: 10, sequenceBits: 10);
         $resolver->setWorker(fn () => 5000);
         $generator = new FlexIdGenerator(workerResolver: $resolver);
-        $this->expectException(\DomainException::class);
+        $this->expectException(IdGeneratorException::class);
         $generator->id();
     }
 
@@ -310,7 +325,7 @@ final class GeneratorTest extends TestCase
         $resolver = new TestingWorkerResolver(workerTimeoutMs: 5, workersBits: 10, sequenceBits: 10);
         $resolver->setWorker(fn () => -1);
         $generator = new FlexIdGenerator(workerResolver: $resolver);
-        $this->expectException(\DomainException::class);
+        $this->expectException(IdGeneratorException::class);
         $generator->id();
     }
 
@@ -321,6 +336,34 @@ final class GeneratorTest extends TestCase
         $generator = new FlexIdGenerator(workerResolver: $resolver);
         $this->expectException(NoWorkerAvailableException::class);
         $generator->id();
+    }
+
+    public function testTimestampDiffWithExplicitDate(): void
+    {
+        $resolver = new TestingWorkerResolver();
+        $resolver->setWorker(fn () => 1);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+        $ids = [];
+        $ids[] = $generator->id();
+
+        // 10 sec in future
+        $referenceMicrotime = (int) ((\microtime(true) + 10) * 1_000_000);
+        $ids[] = $generator->idInTime($referenceMicrotime);
+        $ids[] = $generator->idInTime($referenceMicrotime);
+
+        $timestep1 = $generator->getTimestampFromId($ids[0]) / 1e6;
+        $timestep2 = $generator->getTimestampFromId($ids[1]) / 1e6;
+
+        $this::assertEquals(10, round($timestep2 - $timestep1));
+
+        $ids[] = $generator->id();
+        $this::assertCount(count($ids), \array_unique($ids));
+
+        $this::expectException(IdGeneratorException::class);
+        // exceed sequence for the same reference time
+        for ($i = 0; $i < $resolver->getConfiguration()->maxSequence; $i++) {
+            $generator->idInTime($referenceMicrotime);
+        }
     }
 
     public function testHandleTimestepDiffAfterMaxSequenceWorker(): void
@@ -354,5 +397,121 @@ final class GeneratorTest extends TestCase
             ->withAnyParameters()
             ->willThrowException(new \Exception());
         $this::assertFalse($generator->releaseWorker());
+    }
+
+    public function testGenerateIdWithImplicitReferenceDateWithDefaultTimeshift(): void
+    {
+        $resolver = new TestingWorkerResolver(
+            groupId: 3,
+            groupsBits: 2,
+        );
+        $resolver->setWorker(fn () => 5);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+
+        $total = $resolver->getConfiguration()->maxSequence;
+        $ids = [];
+
+        $referenceMicrotime = (int) (\microtime(true) * 1_000_000);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[] = $generator->idInTime(referenceMicroTimestamp: $referenceMicrotime, workerId: 5);
+        }
+
+        // for more we need to move time
+        $referenceMicrotime = (int) ((\microtime(true) + 1) * 1_000_000);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[] = $generator->idInTime(referenceMicroTimestamp: $referenceMicrotime, workerId: 5);
+        }
+
+        foreach ($ids as $id) {
+            $this::assertSame(5, $generator->getWorkerIdFromId($id));
+            $this::assertSame(3, $generator->getGroupIdFromId($id));
+        }
+
+        $this::assertCount(count($ids), \array_unique($ids));
+
+        // test out of range
+        $this::expectException(IdGeneratorException::class);
+        $referenceMicrotime = ($resolver->getConfiguration()->timestampOffset - 1) * 1_000_000;
+        $generator->idInTime(referenceMicroTimestamp: $referenceMicrotime);
+    }
+
+    public function testGenerateIdWithImplicitReferenceDateWithTimeshift(): void
+    {
+        $resolver = new TestingWorkerResolver(
+            workerTimeoutMs: 600,
+            groupId: 3,
+            workersBits: 3,
+            groupsBits: 2,
+            timestampBitshift: 16,
+        );
+        $resolver->setWorker(fn () => 5);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+
+        $total = $resolver->getConfiguration()->maxSequence;
+        $ids = [];
+
+        $referenceMicrotime = (int) (\microtime(true) * 1_000_000);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[] = $generator->idInTime(referenceMicroTimestamp: $referenceMicrotime, workerId: 5);
+        }
+
+        // for more we need to move time
+        $referenceMicrotime = (int) ((\microtime(true) + 1) * 1_000_000);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[] = $generator->idInTime(referenceMicroTimestamp: $referenceMicrotime, workerId: 5);
+        }
+
+        foreach ($ids as $id) {
+            $this::assertSame(5, $generator->getWorkerIdFromId($id));
+            $this::assertSame(3, $generator->getGroupIdFromId($id));
+        }
+
+        $this::assertCount(count($ids), \array_unique($ids));
+
+        // test out of range
+        $this::expectException(IdGeneratorException::class);
+        $referenceMicrotime = ($resolver->getConfiguration()->timestampOffset - 1) * 1_000_000;
+        $generator->idInTime(referenceMicroTimestamp: $referenceMicrotime);
+    }
+
+    public function testGenerateIdWithImplicitReferenceDateBadWorkerId(): void
+    {
+        $resolver = new TestingWorkerResolver();
+        $resolver->setWorker(fn () => 0);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+
+        $referenceMicrotime = (int) (\microtime(true) * 1_000_000);
+        $this::expectException(IdGeneratorException::class);
+        $generator->idInTime(referenceMicroTimestamp: $referenceMicrotime, workerId: -1);
+    }
+
+    public function testTimestampFromIdBadId(): void
+    {
+        $resolver = new TestingWorkerResolver();
+        $resolver->setWorker(fn () => 0);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+
+        $this::expectException(\InvalidArgumentException::class);
+        $generator->getTimestampFromId(-1);
+    }
+
+    public function testTimestampFromIdOverflowId(): void
+    {
+        $resolver = new TestingWorkerResolver(workerTimeoutMs: 1200, sequenceBits: 4, timestampBitshift: 16);
+        $resolver->setWorker(fn () => 0);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+
+        $this::expectException(\InvalidArgumentException::class);
+        $generator->getTimestampFromId(PHP_INT_MAX);
+    }
+
+    public function testTimestampFromIdOverflowFromDate(): void
+    {
+        $resolver = new TestingWorkerResolver();
+        $resolver->setWorker(fn () => 0);
+        $generator = new FlexIdGenerator(workerResolver: $resolver);
+
+        $this::expectException(\InvalidArgumentException::class);
+        $generator->fromDate(new \DateTime('3000-01-01'));
     }
 }

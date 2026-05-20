@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pvmlibs\FlexId\Resolvers;
 
 use Predis\Client as PredisClient;
@@ -22,15 +24,15 @@ use Pvmlibs\FlexId\VO\IdConfiguration;
  */
 class RedisTimestepWorkerResolver implements WorkerResolverContract
 {
-    private int $workerId = -1;
-    private string $workersKey;
+    protected int $workerId = -1;
+    protected string $workersKey;
 
     /**
      * @var \Closure(string, int, array<int|string>): mixed
      */
-    private \Closure $redisEval;
-    private string $prefix = '_flexid_tw:';
-    private readonly IdConfiguration $configuration;
+    protected \Closure $redisEval;
+    protected string $prefix = '_flexid_tw:';
+    protected IdConfiguration $configuration;
 
     /**
      * @param \Redis|PredisClient $client                         Redis client, for best performance Redis is preferred (ext-redis)
@@ -51,13 +53,15 @@ class RedisTimestepWorkerResolver implements WorkerResolverContract
         public readonly bool $useNewWorkerOnSequenceOverflow = true,
         public readonly int $resolveWorkerTrials = 2,
         public readonly int $timestepExpireSec = 4,
+        public readonly int $timestampBitshift = 0,
+        public readonly int $timestampOffset = 1735689600, // UTC 2025-01-01
     ) {
         $this->redisEval = match ($client::class) {
             \Redis::class => fn (string $script, int $keysNum, array $argsAndKeys) => $this->client->eval($script, $argsAndKeys, $keysNum),
             PredisClient::class => fn (string $script, int $keysNum, array $argsAndKeys) => $this->client->eval(
                 $script,
                 $keysNum,
-                ...$argsAndKeys, // // @phpstan-ignore argument.named
+                ...$argsAndKeys, // @phpstan-ignore argument.named
             ),
             default => throw new \Exception('Client not supported'),
         };
@@ -68,6 +72,8 @@ class RedisTimestepWorkerResolver implements WorkerResolverContract
             groupsBits: $this->groupsBits,
             groupId: $this->groupId,
             useNewWorkerOnSequenceOverflow: $this->useNewWorkerOnSequenceOverflow,
+            timestampBitshift: $this->timestampBitshift,
+            timestampOffset: $this->timestampOffset,
         );
 
         $this->setPrefix($this->prefix);
@@ -83,7 +89,7 @@ class RedisTimestepWorkerResolver implements WorkerResolverContract
      */
     public function resolveWorkerId(int $currentTimeUs, int $currentTimestepNs): int
     {
-        /* @var false|list<int> $result */
+        /* @var false|int $result */
         try {
             $result = ($this->redisEval)(
                 <<<'LUA'
@@ -116,9 +122,10 @@ class RedisTimestepWorkerResolver implements WorkerResolverContract
         return $this->workerId;
     }
 
-    private function setPrefix(string $prefix): self
+    protected function setPrefix(string $prefix): self
     {
-        $this->prefix = $prefix;
+        // concurrent workers with different time configurations should have separate keys
+        $this->prefix = $prefix . "{$this->timestampBitshift}:{$this->timestampOffset}:";
         $this->workersKey = $this->prefix . 'ts_workers:' . $this->groupId . ':';
 
         return $this;
@@ -166,7 +173,7 @@ class RedisTimestepWorkerResolver implements WorkerResolverContract
         );
     }
 
-    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0): bool
+    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0, $nowUs = 0): bool
     {
         if ($this->workerId === -1) {
             return false;

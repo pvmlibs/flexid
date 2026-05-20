@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Resolvers;
 
 use PHPUnit\Framework\TestCase;
+use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\Resolvers\StaticWorkerResolver;
 
@@ -42,7 +45,7 @@ final class StaticResolverTest extends TestCase
 
         $resolver2 = new StaticWorkerResolver(fn () => $workerId, workersBits: 8);
         $resolver->clearLock();
-        $this->expectException(\Exception::class);
+        $this->expectException(IdConfigurationException::class);
         $resolver2->resolveWorkerId(1000, 2000);
     }
 
@@ -51,12 +54,18 @@ final class StaticResolverTest extends TestCase
         $workerId = 5;
         $resolver = new StaticWorkerResolver(fn () => $workerId);
         $resolver->clearLock();
+        $resolver2 = new StaticWorkerResolver(fn () => $workerId, workersBits: 14, timestampBitshift: 16);
+        $resolver2->clearLock();
 
         $resolvedWorkerId = $resolver->resolveWorkerId(1000, 1000);
         $this::assertSame($workerId, $resolvedWorkerId);
         $resolver->releaseWorker(1000, 1000);
 
         $resolver = new StaticWorkerResolver(fn () => $workerId, workersBits: 8);
+
+        // different time configuration should have own config so this should pass
+        $resolvedWorkerId2 = $resolver2->resolveWorkerId(1000, 1000);
+        $this::assertSame($resolvedWorkerId, $resolvedWorkerId2);
 
         $this->expectException(NoWorkerAvailableException::class);
         $resolver->resolveWorkerId(1000, 1000);
@@ -70,7 +79,7 @@ final class StaticResolverTest extends TestCase
         $this::assertTrue($resolver->releaseWorker());
     }
 
-    public function testResolveWithOutLock(): void
+    public function testResolveWithoutLockFile(): void
     {
         $resolver = new StaticWorkerResolver(workerHandlerFn: fn () => 1, workerLockFilePath: null);
         $resolver->clearLock();
@@ -86,9 +95,9 @@ final class StaticResolverTest extends TestCase
         $resolver = new StaticWorkerResolver(fn () => 1, workersBits: $workersBits, sequenceBits: $sequenceBits, groupsBits: $groupsBits);
         $this::assertFalse($resolver->dependsOnTimestamp());
         $this::assertSame(2, $resolver->getMaxWorkerResolveTrials());
-        $this::assertSame($resolver->getConfiguration()->workersBits, $workersBits);
-        $this::assertSame($resolver->getConfiguration()->sequenceBits, $sequenceBits);
-        $this::assertSame($resolver->getConfiguration()->groupsBits, $groupsBits);
-        $this::assertSame($resolver->getConfiguration()->groupId, 0);
+        $this::assertSame($workersBits, $resolver->getConfiguration()->workersBits);
+        $this::assertSame($sequenceBits, $resolver->getConfiguration()->sequenceBits);
+        $this::assertSame($groupsBits, $resolver->getConfiguration()->groupsBits);
+        $this::assertSame(0, $resolver->getConfiguration()->groupId);
     }
 }

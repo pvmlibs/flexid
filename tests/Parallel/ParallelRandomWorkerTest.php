@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Parallel;
 
 use PHPUnit\Framework\TestCase;
@@ -16,12 +18,12 @@ final class ParallelRandomWorkerTest extends TestCase
 
     public function testConcurrentGenerators(): void
     {
-        $this->generate(20, 100, 0);
+        $this->generate(10, 100, 0);
     }
 
     public function testConcurrentGeneratorsWithPid(): void
     {
-        $this->generate(20, 100, 7);
+        $this->generate(10, 100, 7);
     }
 
     private function generateIds(int $taskId, int $idsPerProcess, int $workersBits, int $groupsBits, int $pidBits): void

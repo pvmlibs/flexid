@@ -18,18 +18,22 @@ RUN apk add --update \
     "php$PHP_VERSION"-iconv \
     "php$PHP_VERSION"-spx \
     "php$PHP_VERSION"-pecl-pcov \
+    "php$PHP_VERSION"-apcu \
+    "php$PHP_VERSION"-bcmath \
     "php$PHP_VERSION"-json &&  \
     rm  -rf /tmp/* /var/cache/apk/* && \
     adduser -D $DOCKER_USER && \
     addgroup $DOCKER_USER www-data && \
     # Get composer
-    wget https://getcomposer.org/download/2.8.12/composer.phar && \
+    wget https://getcomposer.org/download/2.9.8/composer.phar && \
     mv composer.phar /usr/local/bin/composer && \
     chmod +x /usr/local/bin/composer && \
     chown $DOCKER_USER:$DOCKER_USER /usr/local/bin/composer && \
     mkdir -p /var/www && \
     chown -R $DOCKER_USER:$DOCKER_USER /var/www && \
     ln -s /usr/bin/php$PHP_VERSION /usr/bin/php || true
+
+RUN echo -e "apc.enabled=1\napc.enable_cli=1" >> /etc/"php$PHP_VERSION"/php.ini
 
 USER $DOCKER_USER
 WORKDIR /var/www

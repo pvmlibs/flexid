@@ -43,7 +43,8 @@ jobs:
           php-version: 8.1
           tools: composer:v2
           coverage: pcov
-          extensions: redis, pcntl
+          extensions: redis, pcntl, apcu, bcmath
+          ini-values: apc.enabled=1, apc.enable_cli=1
 
       - name: Install dependencies
         uses: nick-fields/retry@v2

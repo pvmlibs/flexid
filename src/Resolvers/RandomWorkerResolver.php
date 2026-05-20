@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pvmlibs\FlexId\Resolvers;
 
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
@@ -39,6 +41,7 @@ class RandomWorkerResolver implements WorkerResolverContract
         public readonly int $workersBits = 11,
         public readonly int $groupsBits = 0,
         public readonly int $pidBits = 0,
+        public readonly int $timestampOffset = 1735689600, // UTC 2025-01-01
     ) {
         $this->configuration = new IdConfiguration(
             workersBits: $this->workersBits,
@@ -48,6 +51,7 @@ class RandomWorkerResolver implements WorkerResolverContract
             // this kind of implement sequence - this way generator will ask for new worker on sequence overflow instead
             // of waiting till next timestep (in practice >~50us)
             useNewWorkerOnSequenceOverflow: true,
+            timestampOffset: $this->timestampOffset,
         );
 
         if ($this->pidBits > $this->workersBits) {
@@ -98,7 +102,7 @@ class RandomWorkerResolver implements WorkerResolverContract
         return $this->workerId;
     }
 
-    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0): bool
+    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0, $nowUs = 0): bool
     {
         if ($this->workerId === -1) {
             return false;

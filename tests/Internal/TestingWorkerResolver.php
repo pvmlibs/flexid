@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Internal;
 
 use Pvmlibs\FlexId\Resolvers\WorkerResolverContract;
@@ -24,6 +26,8 @@ class TestingWorkerResolver implements WorkerResolverContract, WorkerResolverHas
         private readonly bool $useNewWorkerOnSequenceOverflow = false,
         private readonly bool $dependsOnTimestep = false,
         private readonly int $resolveTrials = 1,
+        private readonly int $timestampBitshift = 0,
+        private readonly int $timestampOffset = 1735689600,
     ) {
         $this->workerIdFn = fn () => -1;
     }
@@ -49,7 +53,7 @@ class TestingWorkerResolver implements WorkerResolverContract, WorkerResolverHas
         return $this->workerTimeoutMs;
     }
 
-    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0): bool
+    public function releaseWorker(int $lastIdGenTimeUs = 0, int $lastTimeStepNs = 0, int $nowUs = 0): bool
     {
         return true;
     }
@@ -89,6 +93,8 @@ class TestingWorkerResolver implements WorkerResolverContract, WorkerResolverHas
             groupsBits: $this->groupsBits,
             groupId: $this->groupId,
             useNewWorkerOnSequenceOverflow: $this->useNewWorkerOnSequenceOverflow,
+            timestampBitshift: $this->timestampBitshift,
+            timestampOffset: $this->timestampOffset,
         );
     }
 }
