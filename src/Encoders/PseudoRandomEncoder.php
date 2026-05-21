@@ -133,4 +133,9 @@ class PseudoRandomEncoder implements EncoderContract
     {
         return \strlen($this->encode(PHP_INT_MAX));
     }
+
+    public function getAlphabet(): string
+    {
+        return $this->alphabet;
+    }
 }

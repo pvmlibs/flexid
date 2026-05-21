@@ -152,7 +152,7 @@ class IdStats
 
         if ($this->encrypter !== null) {
             $results['encrypter current id length'] = \strlen($this->encrypter->encrypt($testId));
-            $results['encrypter max id length'] = $this->encrypter->getMaxEncryptedLength();
+            $results['encrypter max id length'] = $this->encrypter->getSerializer()->getMaxEncodedLength();
 
         }
 
@@ -246,7 +246,37 @@ class IdStats
     public function presentation(bool $info = true, bool $distribution = true, bool $performance = true): string
     {
         $data = $this->generateDistributionData();
-        $text = '';
+        $text = "Stats using\n";
+        $config = $this->generator->workerResolver->getConfiguration();
+        $class = explode('\\', $this->generator->workerResolver::class);
+        $text .= sprintf(
+            "Resolver: %s(max workers %d, max sequence %d, max groups %d, timestamp bitshift %d)\n",
+            end($class),
+            $config->maxWorkers,
+            $config->maxSequence,
+            $config->maxGroups,
+            $config->timestampBitshift,
+        );
+
+        if ($this->encoder !== null) {
+            $class = explode('\\', $this->encoder::class);
+            $text .= sprintf(
+                "Encoder: %s(alphabet %s)\n",
+                end($class),
+                $this->encoder->getAlphabet(),
+            );
+        }
+
+        if ($this->encrypter !== null) {
+            $encrypterClass = explode('\\', $this->encrypter::class);
+            $serializerClass = explode('\\', $this->encrypter->getSerializer()::class);
+            $text .= sprintf(
+                "Encoder: %s(serializer: %s, alphabet %s)\n",
+                end($encrypterClass),
+                end($serializerClass),
+                $this->encrypter->getSerializer()->getAlphabet(),
+            );
+        }
 
         if ($info) {
             $text = "Generator info\n\n";

@@ -12,7 +12,7 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
  *  - provide as short string from int id as possible, given provided alphabet
  *  - probability of building random words should be very low, especially profanity ones, but we also don't want to maintain
  *    custom dictionary with blacklisted words.
- *  - encoded id is monotonic - for some application this is desired
+ *  - encoded id is monotonic - sequential id are similar when encoded but will not be in order when sorting e.g. in DB
  *  - fast encode/decode
  * If you want id as short as possible and don't care about building random words, you can add more chars to alphabet.
  * Remember that once set, along with offset they can't be changed, or you won't be able to decode id that was encoded
@@ -117,5 +117,10 @@ class MonotonicEncoder implements EncoderContract
     public function getMaxEncodedLength(): int
     {
         return \strlen($this->encode(PHP_INT_MAX));
+    }
+
+    public function getAlphabet(): string
+    {
+        return $this->alphabet;
     }
 }

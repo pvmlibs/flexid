@@ -194,8 +194,8 @@ class Sparx64Encrypter implements EncrypterContract
         return $subkeys;
     }
 
-    public function getMaxEncryptedLength(): int
+    public function getSerializer(): SerializerContract
     {
-        return $this->serializer->getMaxEncodedLength();
+        return $this->serializer;
     }
 }

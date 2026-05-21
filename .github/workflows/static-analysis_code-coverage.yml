@@ -1,16 +1,10 @@
 name: static analysis
-
 on:
   workflow_dispatch:
+  pull_request:
   push:
     branches:
       - master
-      - '*.x'
-  pull_request:
-
-permissions:
-  contents: read
-
 jobs:
   tests:
     runs-on: ubuntu-22.04
@@ -35,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2

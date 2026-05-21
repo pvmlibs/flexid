@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Encrypters;
+namespace Tests\Encrypters;
 
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Encrypters\Serializers\BCMathSerializer;

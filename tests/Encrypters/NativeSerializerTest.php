@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Encrypters;
+namespace Tests\Encrypters;
 
 use PHPUnit\Framework\TestCase;
+use Pvmlibs\FlexId\Encrypters\Serializers\BCMathSerializer;
 use Pvmlibs\FlexId\Encrypters\Serializers\NativeSerializer;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 
@@ -13,38 +14,18 @@ use Pvmlibs\FlexId\Exceptions\IdDecodeException;
  */
 final class NativeSerializerTest extends TestCase
 {
-    public function testSerializeDeserialize(): void
+    use HasSerializerTesting;
+
+    public function testSerializeDeserializeWithDefaultAlphabet(): void
     {
         $serializer = new NativeSerializer();
+        $this->validateSerializeDeserialize($serializer);
+    }
 
-        $serializedIds = [];
-        for ($i = 0; $i < 0xFFFF; $i += 1000) {
-            $toSerialize = [
-                $i, $i, $i, $i,
-            ];
-            $serializedIds[] = ($id = $serializer->serialize($toSerialize));
-            $this::assertSame($toSerialize, $serializer->deserialize($id));
-        }
-
-        $this::assertCount(\count($serializedIds), \array_unique($serializedIds));
-
-        $serializedIds = [];
-        for ($i = 0; $i < 1000; $i++) {
-            $toSerialize = [
-                \rand($i, 0xFFFF), \rand($i, 0xFFFF), \rand($i, 0xFFFF), \rand($i, 0xFFFF),
-            ];
-            $serializedIds[] = ($id = $serializer->serialize($toSerialize));
-            $this::assertSame($toSerialize, $serializer->deserialize($id));
-        }
-
-        $this::assertCount(\count($serializedIds), \array_unique($serializedIds));
-
-        $maxId = [
-            0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
-        ];
-        $encoded = $serializer->serialize($maxId);
-        $this::assertSame($maxId, $serializer->deserialize($encoded));
-        $this::assertSame(\strlen($encoded), $serializer->getMaxEncodedLength());
+    public function testSerializeDeserializeWithExtendedAlphabet(): void
+    {
+        $encoder = new NativeSerializer(BCMathSerializer::EXTENDED_ALPHABET);
+        $this->validateSerializeDeserialize($encoder);
     }
 
     public function testEmptyAlphabet(): void

@@ -26,4 +26,6 @@ interface SerializerContract
     public function deserialize(string $data): array;
 
     public function getMaxEncodedLength(): int;
+
+    public function getAlphabet(): string;
 }

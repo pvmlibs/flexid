@@ -20,4 +20,6 @@ interface EncoderContract
     public function decode(string $id): int;
 
     public function getMaxEncodedLength(): int;
+
+    public function getAlphabet(): string;
 }

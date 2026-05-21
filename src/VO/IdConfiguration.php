@@ -12,6 +12,7 @@ class IdConfiguration
     public readonly int $timestepNs;
     public readonly int $maxWorkers;
     public readonly int $maxSequence;
+    public readonly int $maxGroups;
     public const MAX_METADATA_BITS = 30; // 1073741824 ns -> ~ 1,07 s time resolution with 30 bits
 
     /**
@@ -63,5 +64,6 @@ class IdConfiguration
         $this->timestepNs = max(1 << $this->totalMetaDataBits, 1 << ($this->timestampBitshift + max($this->totalMetaDataBits, 10)));
         $this->maxWorkers = 1 << $this->workersBits;
         $this->maxSequence = 1 << $this->sequenceBits;
+        $this->maxGroups = 1 << $this->groupsBits;
     }
 }

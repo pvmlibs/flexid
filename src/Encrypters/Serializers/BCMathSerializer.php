@@ -107,4 +107,9 @@ class BCMathSerializer implements SerializerContract
             0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
         ]));
     }
+
+    public function getAlphabet(): string
+    {
+        return $this->alphabet;
+    }
 }

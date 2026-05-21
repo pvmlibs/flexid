@@ -14,28 +14,18 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
  */
 final class MonotonicEncoderTest extends TestCase
 {
-    public function testEncodeDecode(): void
+    use HasEncoderTesting;
+
+    public function testWithDefaultAlphabet(): void
     {
         $encoder = new MonotonicEncoder();
+        $this->validateEncodeDecode($encoder);
+    }
 
-        $encodedIds = [];
-        for ($i = 0; $i < 50; $i++) {
-            $encodedIds[] = $encoder->encode($i);
-            $this::assertSame($i, $encoder->decode($encodedIds[$i]));
-        }
-        $this::assertCount(\count($encodedIds), \array_unique($encodedIds));
-
-        $encodedIds = [];
-        for ($i = 100; $i < PHP_INT_MAX; $i += \intdiv(PHP_INT_MAX, 10000)) {
-            $encodedIds[] = ($id = $encoder->encode($i));
-            $this::assertSame($i, $encoder->decode($id));
-        }
-
-        $this::assertCount(\count($encodedIds), \array_unique($encodedIds));
-
-        $encoded = $encoder->encode(PHP_INT_MAX);
-        $this::assertSame(PHP_INT_MAX, $encoder->decode($encoded));
-        $this::assertSame(\strlen($encoded), $encoder->getMaxEncodedLength());
+    public function testWithExtendedAlphabet(): void
+    {
+        $encoder = new MonotonicEncoder(MonotonicEncoder::EXTENDED_ALPHABET);
+        $this->validateEncodeDecode($encoder);
     }
 
     public function testEmptyAlphabet(): void

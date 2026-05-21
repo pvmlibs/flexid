@@ -22,7 +22,7 @@ final class ParallelRedisShortReservedWorkerTest extends TestCase
         $this->generate(2, 1000, workersBits: 0, sequenceBits: 11, timestampShift: 14, ttl: 200); // timestep 33ms x 2048 -> 64k/worker/s
         $this->generate(4, 200, workersBits: 4, sequenceBits: 7, timestampShift: 14, ttl: 1000); // timestep 33ms x 128 -> 4k/worker/s
         $this->generate(4, 200, workersBits: 3, sequenceBits: 7, timestampShift: 17, ttl: 200); // timestep 134ms x 128 -> 1k/worker/s
-        $this->generate(3, 600, workersBits: 2, sequenceBits: 8, timestampShift: 14, ttl: 1000, newWorkerOnOverflow: true); // timestep 67ms x 256 -> 4k/worker/s
+        $this->generate(4, 600, workersBits: 2, sequenceBits: 8, timestampShift: 10, ttl: 1000, newWorkerOnOverflow: true); // timestep 67ms x 256 -> 4k/worker/s
     }
 
     private function generateIds(
@@ -42,6 +42,7 @@ final class ParallelRedisShortReservedWorkerTest extends TestCase
             sequenceBits: $sequenceBits,
             useNewWorkerOnSequenceOverflow: $newWorkerOnOverflow,
             TTLMs: $ttl,
+            resolveWorkerTrials: 4,
             timestampBitshift: $timestampShift,
         );
         $generator = new FlexIdGenerator(workerResolver: $resolver);
@@ -68,7 +69,14 @@ final class ParallelRedisShortReservedWorkerTest extends TestCase
         bool $newWorkerOnOverflow = false,
     ): void {
         $dbRedis = $this->getRedisClient();
-        $resolver = new ShortRedisReservedWorkerResolver(client: $dbRedis);
+        $resolver = new ShortRedisReservedWorkerResolver(
+            client: $dbRedis,
+            workersBits: $workersBits,
+            sequenceBits: $sequenceBits,
+            useNewWorkerOnSequenceOverflow: $newWorkerOnOverflow,
+            TTLMs: $ttl,
+            timestampBitshift: $timestampShift,
+        );
         $resolver->clearDatabase();
 
         for ($i = 0; $i < $taskCount; $i++) {

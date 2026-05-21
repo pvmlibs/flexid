@@ -62,7 +62,8 @@ lifespan. For more read [ID structure](docs/IdStructure.md)
    also define a fallback to other generator if it can't resolve worker id.
 3. Encoders - encodes ID to string/decodes from int using provided alphabet. The default alphabet is stripped from common
    vowels to prevent forming random words
-   - MonotonicEncoder - encoded ID are still monotonical but with alphabet, so sequential ID are similar
+   - MonotonicEncoder - encoded ID are just encoded with alphabet, sequential ID are similar, order is not maintained
+     when sorting
    - PseudoRandomEncoder - encoded ID seems random even for sequential ID, uses more obfuscation than MonotonicEncoder
 4. Encryptors - encrypts/decrypts ID. It also uses internal switchable encoder.
    - Sparx64Encrypter - uses Sparx ARX-based block cipher than can transform ID to other 64-bit number that looks

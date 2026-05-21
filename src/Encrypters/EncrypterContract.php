@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Encrypters;
 
+use Pvmlibs\FlexId\Encrypters\Serializers\SerializerContract;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
@@ -19,5 +20,5 @@ interface EncrypterContract
      */
     public function decrypt(string $id): int;
 
-    public function getMaxEncryptedLength(): int;
+    public function getSerializer(): SerializerContract;
 }

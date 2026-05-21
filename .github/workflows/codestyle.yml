@@ -1,7 +1,10 @@
 name: codestyle
 on:
-  pull_request:
   workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
 jobs:
   code-coverage:
     name: Code Coverage
@@ -13,7 +16,7 @@ jobs:
           - 8.1
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
 
       - name: Install PHP with extensions
         uses: shivammathur/setup-php@v2
