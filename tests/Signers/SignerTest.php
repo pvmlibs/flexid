@@ -195,6 +195,28 @@ final class SignerTest extends TestCase
         $signer->getIdFromSigned($signed);
     }
 
+    public function testSignWithSalt(): void
+    {
+        $signer = new Signer(
+            serializer: new NativeSerializer(),
+            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+        );
+        $id = 'sdflk4sfk';
+        $signed = $signer->getSignedId($id);
+        $this::assertSame($id, $signer->getIdFromSigned($signed));
+
+        $signer2 = new Signer(
+            serializer: new NativeSerializer(),
+            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            salt: 'abc',
+        );
+        $signedWithSalt = $signer2->getSignedId($id);
+        $this::assertNotSame($signed, $signedWithSalt);
+
+        $this->expectException(IdVerifySignException::class);
+        $signer2->getIdFromSigned($signed);
+    }
+
     public function testTooLongSeparator(): void
     {
         $this->expectException(\InvalidArgumentException::class);

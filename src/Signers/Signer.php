@@ -22,7 +22,7 @@ class Signer implements SignerContract
     /**
      * @param string $key           Secret key used in MAC. This needs to be treated with high confidentiality, do not
      *                              include it in source code. Can use generateKey() method to produce the key. In case of
-     *                              non-cryptographic algorithms, key is concatenated (less secure).
+     *                              non-cryptographic algorithms, key is concatenated to id (less secure).
      * @param string $hashAlgo      hash algorithm, recommended ones in order (for security/speed ratio): siphash-2-4, blake2b, sha256.
      *                              Note that only first 64 bits are taken.
      * @param string $separator     In variable length sign used to separate id part from sign with separator.
@@ -32,6 +32,7 @@ class Signer implements SignerContract
      * @param int    $maxSignLength Limit sign up to that many characters. This lowers security, 16 is max. In some cases
      *                              when still want the shortest possible id, it may just work like crc when maxSignLength = 1
      *                              and empty separator
+     * @param string $salt          Use additional salt for more entropy
      */
     public function __construct(
         private SerializerContract $serializer,
@@ -40,6 +41,7 @@ class Signer implements SignerContract
         private string $hashAlgo = 'siphash-2-4',
         private string $separator = '.',
         private int $maxSignLength = 16,
+        string $salt = '',
     ) {
         $decodedSecret = \base64_decode($key, true);
 
@@ -48,13 +50,13 @@ class Signer implements SignerContract
         }
 
         if ($this->hashAlgo === 'siphash-2-4') { // uses 16 bytes key
-            $this->signFn = fn (string $data) => \sodium_crypto_shorthash($data, $decodedSecret);
+            $this->signFn = fn (string $data) => \sodium_crypto_shorthash($data . $salt, $decodedSecret);
         } elseif ($this->hashAlgo === 'blake2b') {
-            $this->signFn = fn (string $data) => \sodium_crypto_generichash($data, $decodedSecret);
+            $this->signFn = fn (string $data) => \sodium_crypto_generichash($data . $salt, $decodedSecret);
         } elseif (\in_array($this->hashAlgo, \hash_hmac_algos(), true)) {
-            $this->signFn = fn (string $data) => \hash_hmac($this->hashAlgo, $data, $decodedSecret, true);
+            $this->signFn = fn (string $data) => \hash_hmac($this->hashAlgo, $data . $salt, $decodedSecret, true);
         } else {
-            $this->signFn = fn (string $data) => hash($this->hashAlgo, $data, true) . $decodedSecret;
+            $this->signFn = fn (string $data) => hash($this->hashAlgo, $data . $salt . $decodedSecret, true);
         }
 
         if ($maxSignLength < 1) {
