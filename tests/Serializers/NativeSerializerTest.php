@@ -2,66 +2,72 @@
 
 declare(strict_types=1);
 
-namespace Tests\Encrypters;
+namespace Tests\Serializers;
 
 use PHPUnit\Framework\TestCase;
-use Pvmlibs\FlexId\Encrypters\Serializers\BCMathSerializer;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
+use Pvmlibs\FlexId\Serializers\NativeSerializer;
 
 /**
  * @internal
  */
-final class BCMathSerializerTest extends TestCase
+final class NativeSerializerTest extends TestCase
 {
     use HasSerializerTesting;
 
     public function testSerializeDeserializeWithDefaultAlphabet(): void
     {
-        $serializer = new BCMathSerializer();
+        $serializer = new NativeSerializer();
         $this->validateSerializeDeserialize($serializer);
     }
 
     public function testSerializeDeserializeWithExtendedAlphabet(): void
     {
-        $encoder = new BCMathSerializer(BCMathSerializer::EXTENDED_ALPHABET);
+        $encoder = new NativeSerializer(NativeSerializer::EXTENDED_ALPHABET);
         $this->validateSerializeDeserialize($encoder);
     }
 
     public function testEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new BCMathSerializer('');
+        new NativeSerializer('');
     }
 
     public function testTooSmallAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new BCMathSerializer('s');
+        new NativeSerializer('s');
     }
 
     public function testNotUniqueAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new BCMathSerializer('ssd');
+        new NativeSerializer('ssd');
     }
 
     public function testAlphabetContainsMultibyteChars(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new BCMathSerializer('sbâ');
+        new NativeSerializer('sbâ');
     }
 
     public function testEmptyId(): void
     {
-        $serializer = new BCMathSerializer();
+        $serializer = new NativeSerializer();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('');
     }
 
     public function testBadCharactersInId(): void
     {
-        $serializer = new BCMathSerializer();
+        $serializer = new NativeSerializer();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('-');
+    }
+
+    public function testIsConstantLength(): void
+    {
+        $serializer = new NativeSerializer();
+        $this::assertFalse($serializer->isConstantLength());
     }
 }

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Encrypters;
 
-use Pvmlibs\FlexId\Encrypters\Serializers\SerializerContract;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
+use Pvmlibs\FlexId\Serializers\SerializerContract;
 
 /**
  * Encrypts/decrypts id using Sparx64 algorithm. This can be used when raw id are considered
@@ -26,11 +26,13 @@ class Sparx64Encrypter implements EncrypterContract
     private array $subkeys = [];
 
     /**
-     * @param string $secret base64 encoded, 16 bytes secret
+     * @param string $secret Secret used by cipher. This needs to be treated with high confidentiality, do not
+     *                       include it in source code. Can use generateSecret() method to produce the secret.
      *
      * @throws \InvalidArgumentException
      */
     public function __construct(
+        #[\SensitiveParameter]
         string $secret,
         private SerializerContract $serializer,
     ) {
@@ -42,7 +44,7 @@ class Sparx64Encrypter implements EncrypterContract
 
         $masterKey = [];
         for ($i = 0; $i < 2 * self::K_SIZE; $i++) {
-            $masterKey[$i] = (\ord($secret[2 * $i]) << 8) | \ord($secret[2 * $i + 1]);
+            $masterKey[$i] = (\ord($decodedSecret[2 * $i]) << 8) | \ord($decodedSecret[2 * $i + 1]);
         }
         $this->subkeys = $this->keySchedule($masterKey);
     }

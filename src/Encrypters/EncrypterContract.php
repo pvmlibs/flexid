@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Encrypters;
 
-use Pvmlibs\FlexId\Encrypters\Serializers\SerializerContract;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
+use Pvmlibs\FlexId\Serializers\SerializerContract;
 
 interface EncrypterContract
 {

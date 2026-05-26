@@ -56,6 +56,9 @@
    Nevertheless, it can only work within one host, for multi node environment it cannot guarantee uniqueness, unless you
    set distinct group id for each node.
 
+There are also variations of above resolvers preconfigured to use with high timestamp bitshift to achieve shorter
+timestamp based ID, prefixed with Short*.
+
 All above resolvers are preconfigured for most common cases and should work performant out of the box, but you can
 adjust bits for your needs. Check also code for the description of class parameters.
 To save resources, generator will only request for worker on first ID generation.

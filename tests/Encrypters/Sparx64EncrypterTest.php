@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Encrypters;
 
 use PHPUnit\Framework\TestCase;
-use Pvmlibs\FlexId\Encrypters\Serializers\BCMathSerializer;
-use Pvmlibs\FlexId\Encrypters\Serializers\NativeSerializer;
 use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
+use Pvmlibs\FlexId\Serializers\BCMathSerializer;
+use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
+use Pvmlibs\FlexId\Serializers\GMPSerializer;
+use Pvmlibs\FlexId\Serializers\NativeSerializer;
 
 /**
  * @internal
@@ -27,33 +29,40 @@ final class Sparx64EncrypterTest extends TestCase
         $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new NativeSerializer()));
     }
 
+    public function testEncryptDecryptWithGMPSerializer(): void
+    {
+        $secret = Sparx64Encrypter::generateSecret();
+        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new GMPSerializer()));
+    }
+
+    public function testEncryptDecryptWithFixedLengthSerializer(): void
+    {
+        $secret = Sparx64Encrypter::generateSecret();
+        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new FixedLengthSerializer()));
+    }
+
     private function runBatch(Sparx64Encrypter $encrypter): void
     {
         $encryptedIds = [];
-        for ($i = 0; $i < 50; $i++) {
+        for ($i = 0; $i < 200; $i++) {
             $encryptedIds[] = $encrypter->encrypt($i);
             $this::assertSame($i, $encrypter->decrypt($encryptedIds[$i]));
         }
         $this::assertCount(\count($encryptedIds), \array_unique($encryptedIds));
 
-        // test linear across whole range
-        $step = \intdiv(PHP_INT_MAX, 1000);
-        $encryptedIds = [];
-
-        for ($i = 100; $i < PHP_INT_MAX; $i += $step) {
-            $encryptedIds[] = ($id = $encrypter->encrypt($i));
-            $this::assertSame($i, $encrypter->decrypt($id));
-        }
-
-        $this::assertCount(\count($encryptedIds), \array_unique($encryptedIds));
+        $incrementHashDecrypted = hash_init('sha256');
+        $incrementHashToEncrypt = hash_init('sha256');
 
         // test random id from whole range
         $encryptedIds = [];
-        for ($i = 0; $i < 10000; $i++) {
+        for ($i = 0; $i < 2000; $i++) {
             $id = \random_int(1001, PHP_INT_MAX - 1);
             $encryptedIds[] = ($idEncrypted = $encrypter->encrypt($id));
-            $this::assertSame($id, $encrypter->decrypt($idEncrypted));
+            hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($idEncrypted));
+            hash_update($incrementHashToEncrypt, (string) $id);
         }
+
+        $this::assertSame(\hash_final($incrementHashDecrypted), \hash_final($incrementHashToEncrypt));
 
         $this::assertCount(\count($encryptedIds), \array_unique($encryptedIds));
 

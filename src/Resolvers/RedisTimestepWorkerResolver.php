@@ -15,7 +15,7 @@ use Pvmlibs\FlexId\VO\IdConfiguration;
  * and moderate Redis utilization - one generator will send one request/268 ms/up to max sequence (with default settings).
  * Memory usage within $timestepExpireSec is proportional to ID generation rate and lower metadata bits
  * (so lower timestep, DB entry is per timestep). For example, using $workersBits 18 and $sequenceBits 10 gives
- * ~268ms timestep (maximum allowed), with $timestepExpireSec=4s, 4/0.268 * 16 B (per timestep) = max usage 256 B.
+ * ~268ms timestep, with $timestepExpireSec=4s, 4/0.268 * 16 B (per timestep) = max usage 256 B.
  * With defaults settings there is maximum throughput of 2^18 * (1/0.268) = 978149 workers requests/sec and each worker
  * can then use offline (without Redis communication) sequence of max 256 (2^8) within timestep (268 ms).
  * Redis/Valkey DB throughput will be much lower, like <100k requests/s so if your application needs more, you will need

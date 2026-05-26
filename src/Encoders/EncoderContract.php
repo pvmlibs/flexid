@@ -7,6 +7,9 @@ namespace Pvmlibs\FlexId\Encoders;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
+/**
+ * Transforms signed positive int to/from string.
+ */
 interface EncoderContract
 {
     /**
@@ -22,4 +25,6 @@ interface EncoderContract
     public function getMaxEncodedLength(): int;
 
     public function getAlphabet(): string;
+
+    public function isConstantLength(): bool;
 }

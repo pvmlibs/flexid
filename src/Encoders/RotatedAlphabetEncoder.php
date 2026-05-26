@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Encoders;
 
-use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
@@ -25,24 +24,23 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
  * Encoding is however still better than just providing raw id. Set shuffled version of the alphabet
  * (e.g. with str_shuffle() and offset) to get best results.
  */
-class PseudoRandomEncoder implements EncoderContract
+class RotatedAlphabetEncoder implements EncoderContract
 {
+    use HasEncoderMaxOutput;
+
     /**
      * Shuffled alphabet with removed e, E, a, A, e, i, I, o, O, l, u, U, 0 to lower probability of building random words.
+     * Max 12 chars output length.
      */
     public const SAFE_ALPHABET = 'd7x3Db2LY5Qgv1k9wZFfKMCztc6nPh4XyBsJ8VRpNSHTmqjGrW';
 
-    /**
-     * Shuffled 64 chars, a-zA-Z0-9-_.
-     */
-    public const EXTENDED_ALPHABET = 'R9jHJSAcLBfFroKqTzXvgxtNbsp83DEkVMIn-y0m5hdG_P47awQl26uYZUeW1iCO';
     private int $maxEncodedLength;
+    private string $unrolledAlphabet;
 
     /**
-     * @param string $alphabet It's recommended to use shuffled version of default alphabet.
+     * @param string $alphabet It's recommended to use shuffled version of default alphabet or use your own.
      *                         Set once for application lifetime.
-     * @param int    $offset   Additional offset used for rotating alphabet.
-     *                         Set once for application lifetime.
+     * @param int    $offset   additional offset used for rotating alphabet
      *
      * @throws \InvalidArgumentException
      */
@@ -50,7 +48,9 @@ class PseudoRandomEncoder implements EncoderContract
         private string $alphabet = self::SAFE_ALPHABET,
         private int $offset = 0,
     ) {
-        if (\strlen($alphabet) < 2) {
+        $alphabetLength = strlen($this->alphabet);
+
+        if ($alphabetLength < 2) {
             throw new \InvalidArgumentException('Alphabet length must be at least 2');
         }
 
@@ -58,17 +58,18 @@ class PseudoRandomEncoder implements EncoderContract
             throw new \InvalidArgumentException('Alphabet must contain unique characters');
         }
 
-        if (\extension_loaded('mbstring') && mb_strlen($this->alphabet) !== \strlen($alphabet)) {
+        if (\extension_loaded('mbstring') && mb_strlen($this->alphabet) !== $alphabetLength) {
             throw new \InvalidArgumentException('Alphabet must not contain multi byte characters');
         }
 
-        $this->maxEncodedLength = $this->getMaxEncodedLength();
+        $this->unrolledAlphabet = $this->alphabet . $this->alphabet;
+        $this->maxEncodedLength = $this->maxOutputs[$alphabetLength];
     }
 
     public function encode(int $id): string
     {
         if ($id < 0) {
-            throw new IdEncodeException('Encrypted ID must be positive.');
+            throw new IdEncodeException('Encoded ID must be positive.');
         }
 
         $alphabetLength = \strlen($this->alphabet);
@@ -78,13 +79,12 @@ class PseudoRandomEncoder implements EncoderContract
         $quotient = \intdiv($quotient, $alphabetLength);
 
         $output = \substr($this->alphabet, $reminder, 1);
-        $rotate = \ord($output) + $this->offset;
+        $rotate = ($reminder + $this->offset) % $alphabetLength;
 
         while ($quotient > 0) {
             $reminder = $quotient % $alphabetLength;
             $quotient = \intdiv($quotient, $alphabetLength);
-
-            $output .= \substr($this->alphabet, ($rotate + $reminder) % $alphabetLength, 1);
+            $output .= \substr($this->unrolledAlphabet, $rotate + $reminder, 1);
         }
 
         return $output;
@@ -96,21 +96,24 @@ class PseudoRandomEncoder implements EncoderContract
             throw new IdDecodeException('Id has incorrect length');
         }
 
-        if ((int) \preg_match('/^[' . \preg_quote($this->alphabet, '/') . ']+$/', $id) === 0) {
+        $alphabetLength = \strlen($this->alphabet);
+        $firstCharPos = \strpos($this->alphabet, $id[0]);
+
+        if ($firstCharPos === false) {
             throw new IdDecodeException('Id has invalid characters');
         }
 
-        $rotate = \ord($id[0]) + $this->offset;
+        $rotate = ($firstCharPos + $this->offset) % $alphabetLength;
         $number = 0;
-        $alphabetLength = \strlen($this->alphabet);
 
-        $split = \str_split($id);
+        for ($i = \strlen($id) - 1; $i; $i--) {
+            $index = \strpos($this->alphabet, $id[$i]);
 
-        for ($i = \count($split) - 1; $i; $i--) {
-            $index = (int) \strpos($this->alphabet, $split[$i]);
+            if ($index === false) {
+                throw new IdDecodeException('Id has invalid characters');
+            }
 
-            $newIndex = ($index - $rotate) % $alphabetLength;
-
+            $newIndex = $index - $rotate;
             if ($newIndex < 0) {
                 $newIndex = $alphabetLength + $newIndex;
             }
@@ -118,12 +121,11 @@ class PseudoRandomEncoder implements EncoderContract
             $number = $number * $alphabetLength + $newIndex;
         }
 
-        $index = (int) \strpos($this->alphabet, $split[0]);
-
-        $number = $number * $alphabetLength + $index;
+        // first character without rotate
+        $number = $number * $alphabetLength + $firstCharPos;
 
         if ($number < 0 || is_float($number)) { // @phpstan-ignore function.impossibleType (this can be float type when overflowed)
-            throw new IdDecodeException('Decrypted ID is out of valid range');
+            throw new IdDecodeException('Decoded ID is out of valid range');
         }
 
         return $number;
@@ -131,11 +133,16 @@ class PseudoRandomEncoder implements EncoderContract
 
     public function getMaxEncodedLength(): int
     {
-        return \strlen($this->encode(PHP_INT_MAX));
+        return $this->maxEncodedLength;
     }
 
     public function getAlphabet(): string
     {
         return $this->alphabet;
+    }
+
+    public function isConstantLength(): bool
+    {
+        return true;
     }
 }

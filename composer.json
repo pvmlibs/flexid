@@ -49,7 +49,10 @@
   "suggest": {
     "ext-redis": "Faster Redis/Valkey communication",
     "ext-apcu": "Enables APCu worker resolver",
-    "ext-bcmath": "Enables serializer for encrypted id with custom alphabet"
+    "ext-bcmath": "Enables serializer for encrypted id and signer with custom alphabet (shorter output)",
+    "ext-gmp": "Enables serializer for encrypted id and signer with custom alphabet (shorter output)",
+    "ext-sodium": "Enables fast SipHash algorithm for signing id",
+    "ext-mbstring": "Enables alphabet validation against multibyte characters"
   },
   "scripts": {
     "check": [

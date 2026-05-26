@@ -1,15 +1,18 @@
 [![CI Status](https://github.com/pvmlibs/flexid/actions/workflows/tests.yml/badge.svg)](https://github.com/pvmlibs/flexid/actions)
 [![codecov](https://codecov.io/gh/pvmlibs/flexid/branch/master/graph/badge.svg?token=26GRS6RJRN)](https://codecov.io/gh/pvmlibs/flexid/branch/master)
 
-# Distributed ID generator for PHP
+# Distributed ID generator for PHP with ID transforming tools
 
-High performance, distributed 64-bit integer ID generator. Features:
+Features:
 - Generate unique ID on one or multiple nodes/processes. Workers management included for efficient ID pool usage
 - Encode integer ID for shorter strings/obfuscate integer ID with custom alphabet e.g. xzRYLSKxJH
 - Encrypt integer ID when need extra security, also produces shorter string e.g. mXjZKfmfXzwPw
+- Sign ID for integrity and authenticity, preventing tampering
 - ID lifespan ranges from 292 to 292271 years
 - up to 1048576 workers
 - customizable generators for many different workflows
+
+Transforming tools (encoders, encrypters, signers) can also work with external ID, including ordinary autoincrement ID.
 
 ## Requirements
 
@@ -18,11 +21,16 @@ Core functionality doesn't require any extensions and dependencies, required are
 1. 64-bit system
 2. PHP >= 8.1
 
-For Redis worker resolvers:
-1. predis package or phpredis extension (preferred for performance).
+For worker resolvers:
+1. Redis based resolvers require predis composer package or phpredis extension (preferred for performance).
+2. APCu based resolvers require apcu extension
 
 For serializing encrypted ID with custom length alphabet:
-1. bcmath extension. You still can serialize encrypted ID without it.
+1. bcmath or gmp extension. You still can serialize encrypted ID without them using power of 2 length alphabet.
+
+For signing:
+1. sodium - enables high performance siphash-2-4. Without it, you can use other slower algorithms available in hash
+    core extension like sha256.
 
 ## Installation
 
@@ -62,27 +70,37 @@ lifespan. For more read [ID structure](docs/IdStructure.md)
    also define a fallback to other generator if it can't resolve worker id.
 3. Encoders - encodes ID to string/decodes from int using provided alphabet. The default alphabet is stripped from common
    vowels to prevent forming random words
-   - MonotonicEncoder - encoded ID are just encoded with alphabet, sequential ID are similar, order is not maintained
-     when sorting
-   - PseudoRandomEncoder - encoded ID seems random even for sequential ID, uses more obfuscation than MonotonicEncoder
-4. Encryptors - encrypts/decrypts ID. It also uses internal switchable encoder.
+   - RotatedAlphabetEncoder - recommended as default, ID are transformed using alphabet and rotation for obfuscation,
+                              sequential ID looks random. Produces smallest possible encoded ID.
+   - FixedLengthEncoder - ID are transformed to fixed, 16-chars string using provided alphabet.
+4. Encryptors - encrypts/decrypts ID.
    - Sparx64Encrypter - uses Sparx ARX-based block cipher than can transform ID to other 64-bit number that looks
-      completely random and prevent reading back ID without secret key. Encrypted ID have to use encoder for printable
+      completely random and prevents reading back ID without secret key. Encrypted ID have to use serializer for printable
       output:
      - NativeSerializer - supports only power of 2 alphabet lengths but don't require any php extensions
-     - BCMathSerializer - supports any alphabet lengths but requires bcmath extensions
+     - BCMathSerializer - supports any alphabet lengths and can produce slightly smaller output than NativeSerializer
+     - GMPSerializer - same as and interoperable with BCMathSerializer
+     - FixedLengthSerializer - produces fixed, 16-chars output using provided alphabet
+5. Signers - sign ID using HMAC. It can ensure that ID comes from us and was not changed. Uses serializer for producing
+   printable output. Sign is concatenated with ID with or without provided separator. It uses first 64 bits from hashing
+   algorithm so max 16 characters for sign, according to used serializer and sign max length setting. Can also use as
+   simple crc with e.g. 1-character sign.
 
 ## Usage
 
 IMPORTANT!
-ID is part of application design, you need to evaluate what the application requirements are, like:
+ID handling is part of application design, you need to evaluate what the application requirements are, like:
 - how many nodes/processes are expected generate ID concurrently
 - what throughput is needed (ID/s/worker)
-- can ID be exposed to public? Raw ID don't expose DB records number as implicit as autoincrement ID but still they can
-  disclose creation time along with information about worker id, sequence and group id. Light form of hiding ID is to
-  use encoder or encrypter for more secure solution. Validate if performance of these solutions are acceptable.
-- should ID be as short as possible? For that you can use e.g. timestamp bitshift 16 and encoder.
-- how ID will be stored in DB? For DB performance the best is bigint type 
+- can ID be exposed to public? Raw, timestamp based ID don't expose DB records number as implicit as autoincrement ID
+  but still they can disclose creation time along with information about worker id, sequence and group id.
+  Light form of hiding ID is to use encoder or encrypter for more secure solution. Validate if performance of these
+  solutions are acceptable.
+- should ID be as short as possible? For that you can use e.g. timestamp bitshift 16 and encoder. Validate with expected
+  id throughput.
+- how ID will be stored in DB? For DB performance the best is bigint type
+- any form of encoding, encrypting and signing ID is practically set in stone if transformed id can come back any time
+  in the future, so these settings needs to be set with care 
 
 Parameters that should be constant through application lifetime to prevent ID overlapping:
 - timestamp offset
@@ -90,18 +108,21 @@ Parameters that should be constant through application lifetime to prevent ID ov
 - encoder parameters (if used) including used alphabet to be able to correctly decode once sent encoded ID
 - encrypter parameters (if used) including used alphabet and secret key to be able to correctly decrypt once sent
   encrypted ID
+- signer settings
 
 Other parameters like worker bits, sequence bits, group bits are pretty safe to manipulate in future - collision can 
-happen only within the same timestep (max 1,07s). If you want to change/have generators with different worker bits and
-sequence bits working concurrently then set common group bits and assign each generator type own group id.  
+happen only within the same timestep (max 1,07s) when concurrently using different parameters. If you want to
+change/have generators with different worker bits and sequence bits working concurrently then set common group bits
+and assign each generator type its own group id.  
 
 You can look at [ID overview](docs/IdOverview.md) to get some idea what to expect.
 
 Some general guidance:
 
 1. Use generator as singleton in application for performance and uniqueness guarantee (in StaticWorkerResolver and
-   RandomWorkerResolver), unless you want to have generators with different configuration.
-2. When sending to JavaScript you need to cast id to string (JS does not handle 64-bit int) or use encoder for that.
+   RandomWorkerResolver), unless you want to have generators with different configuration. Encoders, encrypters and
+   signers should also be singletons.
+2. When sending to JavaScript you need to cast id to string (JS does not handle 64-bit int) or use encoder output.
 
 Generate ID:
 ```php
@@ -127,13 +148,14 @@ $ids = $generator->bulkIds(1000); // array
 ```
 
 Generate ID with encoding. Encoders can be also used to encode/decode any integer number:
+
 ```php
 $generator = new \Pvmlibs\FlexId\FlexIdGenerator(
     workerResolver: new \Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver(client: $redisClient)
 );
-$encoder = new \Pvmlibs\FlexId\Encoders\PseudoRandomEncoder();
+$encoder = new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder();
 
-// using helper container
+// using helper container, can also use signer property when want to sign encoded id
 $encodedId = new \Pvmlibs\FlexId\EncodedId(
    flexIdGenerator: $generator,
    encoder: $encoder,
@@ -150,17 +172,18 @@ $encoder->decode($publicId); // 43581127276918784
 ```
 
 Generate ID with encrypting. Encryptor can be also used to encrypt/decrypt any integer number:
+
 ```php
 $generator = new \Pvmlibs\FlexId\FlexIdGenerator(
     workerResolver: new \Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver(client: $redisClient)
 );
-$secret = \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret();
+$secret = \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(); // use your own secret
 $encrypter = new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
     secret: $secret,
-    serializer: new \Pvmlibs\FlexId\Encrypters\Serializers\NativeSerializer()
+    serializer: new \Pvmlibs\FlexId\Serializers\NativeSerializer()
 );
 
-// using helper container
+// using helper container, can also use signer property when want to sign encrypted id
 $encryptedId = new \Pvmlibs\FlexId\EncryptedId(
     flexIdGenerator: $generator,
     encrypter: $encrypter,
@@ -175,6 +198,34 @@ $id = $generator->id(); // 43581127276918784
 $publicId = $encrypter->encrypt($id); // yVyKqbkQDgYgR
 $encrypter->decrypt($publicId); // 43581127276918784
 ```
+
+Sign ID directly. Signer can be also used to encrypt/decrypt any ID (as string):
+
+```php
+$signer = new \Pvmlibs\FlexId\Signers\Signer(
+    serializer: new \Pvmlibs\FlexId\Serializers\NativeSerializer(),
+    key: \Pvmlibs\FlexId\Signers\Signer::generateKey(), // use your own key
+    hashAlgo: 'siphash-2-4', // default
+    separator: '', // without separator
+    maxSignLength: 1);
+
+$id = 'r8BnZxS';
+$signed = $signer->getSignedId($id); // r8BnZxSQ
+// get id from signed with validation
+$id = $signer->getIdFromSigned($signed); // r8BnZxS
+
+// for max security use max sign length
+$signer = new \Pvmlibs\FlexId\Signers\Signer(
+    serializer: new \Pvmlibs\FlexId\Serializers\NativeSerializer(),
+    key: \Pvmlibs\FlexId\Signers\Signer::generateKey(), // use your own key
+    hashAlgo: 'siphash-2-4',
+    separator: '-' // when using FixedLengthSerializer there is no need to use separator
+);
+
+$id = 'r8BnZxS';
+$signed = $signer->getSignedId($id); // r8BnZxS-DwJgwJWVxfJdx
+```
+
 Backfill ID using Unix timestamp in microseconds. Make sure max sequence is enough for given timestep, sort timestamps
 ascending or descending to prevent duplicates:
 ```php
@@ -183,7 +234,9 @@ $generator->idInTime(1779275145863184)) // 43585545820962816
 
 Check performance, ID distribution in time, throughput with different timestamp bitshift and generator info:
 ```bash
-php vendor/pvmlibs/flexid/bench.php [--dist --info]
+php vendor/pvmlibs/flexid/src/Scripts/bench.php [--dist --info]
+# this is more detailed
+php vendor/pvmlibs/flexid/src/Scripts/perf.php
 ```
 
 You can also use class IdStats passing your configured generator to get results for this configuration.
@@ -207,7 +260,7 @@ with very intensive ID generation, then you can make some other optimizations:
 6. Adjust timestampOffset in generator for max ID range - before using in production use and don't change it later. By
    default, it's Unix timestamp for 2025-01-01.
 7. Use FlexIdGenerator->bulkIds() when applicable (see method description)
-8. Sometimes there is 4x performance difference between php binaries (od Docker images)
+8. Sometimes there is 4x performance difference between php binaries (or Docker images)
 
 ## Performance
 

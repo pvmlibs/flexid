@@ -12,7 +12,7 @@ $generator = new FlexIdGenerator(workerResolver: $resolver);
 
 $bench = new IdStats(
     generator: new FlexIdGenerator(workerResolver: $resolver),
-    encoder: new PseudoRandomEncoder(),
+    encoder: new RotatedAlphabetEncoder(),
     encrypter: new Sparx64Encrypter(
         secret: Sparx64Encrypter::generateSecret(),
         serializer: new NativeSerializer()
@@ -74,9 +74,11 @@ generator current id length | 17
 
 Generator/encoder/encrypter throughput (generating 100000 id):||
 ----------------------------|----
-id generator        |  4076350 [ids/sec]
-id generator burst  | 25949936 [ids/sec]
-id encode           |  2005009 [ids/sec]
-id decode           |  1139566 [ids/sec]
-id encrypt          |   130807 [ids/sec]
-id decrypt          |   139659 [ids/sec]
+id generator        |  4125192 [ids/sec]
+id generator burst  | 25829875 [ids/sec]
+id encode           |  2244739 [ids/sec]
+id decode           |  2497902 [ids/sec]
+id encrypt          |   134047 [ids/sec]
+id decrypt          |   149302 [ids/sec]
+id sign             |   775233 [ids/sec]
+id verify sign      |   702165 [ids/sec]

@@ -1,0 +1,11 @@
+FlexIdGenerator               2,144,442 ops/s
+PseudoRandomEncoder encode    1,175,173 ops/s
+PseudoRandomEncoder decode    695,903 ops/s
+MonotonicEncoder encode       1,315,599 ops/s
+MonotonicEncoder decode       837,077 ops/s
+NativeSerializer serialize    1,156,082 ops/s
+NativeSerializer deserialize  790,132 ops/s
+BCMathSerializer serialize    250,213 ops/s
+BCMathSerializer deserialize  262,190 ops/s
+Sparx64Encrypter encrypt      77,928 ops/s
+Sparx64Encrypter decrypt      81,928 ops/s

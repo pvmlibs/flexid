@@ -11,6 +11,7 @@ use Pvmlibs\FlexId\Exceptions\IdGeneratorException;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\ApcuTimestepWorkerResolver;
 use Pvmlibs\FlexId\Resolvers\StaticWorkerResolver;
+use Pvmlibs\FlexId\Signers\SignerContract;
 
 /**
  * Shows id time range, throughput and lengths for different timestamp bit shifts and years.
@@ -23,8 +24,9 @@ class IdStats
      */
     public function __construct(
         private FlexIdGenerator $generator,
-        private ?EncoderContract $encoder,
-        private ?EncrypterContract $encrypter,
+        private ?EncoderContract $encoder = null,
+        private ?EncrypterContract $encrypter = null,
+        private ?SignerContract $signer = null,
         private array $timestampBitShifts = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
         private array $yearsDelta = [0, 10, 50, 100, 250],
         private int $minIdTestRange = 1000,
@@ -228,6 +230,24 @@ class IdStats
             }
             $end = \hrtime(true);
             $results['perf']['id decrypt'] = \round($total / ($end - $start) * 1e9);
+        }
+
+        if ($this->signer !== null) {
+            $signed = $this->signer->getSignedId('8tYknkpkj58L');
+
+            $start = \hrtime(true);
+            for ($i = 0; $i < $total; $i++) {
+                $this->signer->getSignedId('8tYknkpkj58L');
+            }
+            $end = \hrtime(true);
+            $results['perf']['id sign'] = \round($total / ($end - $start) * 1e9);
+
+            $start = \hrtime(true);
+            for ($i = 0; $i < $total; $i++) {
+                $this->signer->getIdFromSigned($signed);
+            }
+            $end = \hrtime(true);
+            $results['perf']['id verify sign'] = \round($total / ($end - $start) * 1e9);
         }
 
         return $results;

@@ -2,67 +2,72 @@
 
 declare(strict_types=1);
 
-namespace Tests\Encrypters;
+namespace Tests\Serializers;
 
 use PHPUnit\Framework\TestCase;
-use Pvmlibs\FlexId\Encrypters\Serializers\BCMathSerializer;
-use Pvmlibs\FlexId\Encrypters\Serializers\NativeSerializer;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
+use Pvmlibs\FlexId\Serializers\GMPSerializer;
 
 /**
  * @internal
  */
-final class NativeSerializerTest extends TestCase
+final class GMPSerializerTest extends TestCase
 {
     use HasSerializerTesting;
 
     public function testSerializeDeserializeWithDefaultAlphabet(): void
     {
-        $serializer = new NativeSerializer();
+        $serializer = new GMPSerializer();
         $this->validateSerializeDeserialize($serializer);
     }
 
     public function testSerializeDeserializeWithExtendedAlphabet(): void
     {
-        $encoder = new NativeSerializer(BCMathSerializer::EXTENDED_ALPHABET);
+        $encoder = new GMPSerializer(GMPSerializer::EXTENDED_ALPHABET);
         $this->validateSerializeDeserialize($encoder);
     }
 
     public function testEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new NativeSerializer('');
+        new GMPSerializer('');
     }
 
     public function testTooSmallAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new NativeSerializer('s');
+        new GMPSerializer('s');
     }
 
     public function testNotUniqueAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new NativeSerializer('ssd');
+        new GMPSerializer('ssd');
     }
 
     public function testAlphabetContainsMultibyteChars(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new NativeSerializer('sbâ');
+        new GMPSerializer('sbâ');
     }
 
     public function testEmptyId(): void
     {
-        $serializer = new NativeSerializer();
+        $serializer = new GMPSerializer();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('');
     }
 
     public function testBadCharactersInId(): void
     {
-        $serializer = new NativeSerializer();
+        $serializer = new GMPSerializer();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('-');
+    }
+
+    public function testIsConstantLength(): void
+    {
+        $serializer = new GMPSerializer();
+        $this::assertFalse($serializer->isConstantLength());
     }
 }

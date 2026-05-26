@@ -44,9 +44,9 @@ class ApcuTimestepWorkerResolver implements WorkerResolverContract
      */
     public function __construct(
         public readonly int $groupId = 0,
-        public readonly int $workersBits = 12,
-        public readonly int $sequenceBits = 5,
-        public readonly int $groupsBits = 10,
+        public readonly int $workersBits = 10,
+        public readonly int $sequenceBits = 10,
+        public readonly int $groupsBits = 0,
         public readonly bool $useNewWorkerOnSequenceOverflow = true,
         public readonly int $resolveWorkerTrials = 2,
         public readonly int $timestepExpireSec = 2,

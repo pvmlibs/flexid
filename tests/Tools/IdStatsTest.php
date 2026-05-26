@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Tests\Tools;
 
 use PHPUnit\Framework\TestCase;
-use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\FlexIdGenerator;
+use Pvmlibs\FlexId\Serializers\NativeSerializer;
+use Pvmlibs\FlexId\Signers\Signer;
 use Pvmlibs\FlexId\Tools\IdStats;
 
 /**
@@ -25,11 +26,12 @@ final class IdStatsTest extends TestCase
                     timestampBitshift: 0,
                 ),
             ),
-            encoder: new \Pvmlibs\FlexId\Encoders\PseudoRandomEncoder(),
+            encoder: new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder(),
             encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
                 secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
-                serializer: new \Pvmlibs\FlexId\Encrypters\Serializers\NativeSerializer(),
+                serializer: new NativeSerializer(),
             ),
+            signer: new Signer(new NativeSerializer(), 'PsQBSNyMoz60RpQnSKWBMg=='),
             yearsDelta: [0, 10, 50, 100, 350],
         );
         $this::assertNotEmpty($idDistribution->presentation());
@@ -46,11 +48,12 @@ final class IdStatsTest extends TestCase
                     timestampBitshift: 0,
                 ),
             ),
-            encoder: new \Pvmlibs\FlexId\Encoders\PseudoRandomEncoder(),
+            encoder: new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder(),
             encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
                 secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
-                serializer: new \Pvmlibs\FlexId\Encrypters\Serializers\NativeSerializer(),
+                serializer: new NativeSerializer(),
             ),
+            signer: new Signer(new NativeSerializer(), 'PsQBSNyMoz60RpQnSKWBMg=='),
             yearsDelta: [0, 10, 50, 100, 350],
         );
         $this::assertNotEmpty($idDistribution->presentation());
@@ -58,20 +61,21 @@ final class IdStatsTest extends TestCase
 
     public function testIdStatsWrongConfiguration(): void
     {
-        $this->expectException(IdConfigurationException::class);
         $idDistribution = new IdStats(
             generator: new FlexIdGenerator(
                 workerResolver: new \Pvmlibs\FlexId\Resolvers\ApcuTimestepWorkerResolver(
                     workersBits: 10,
                     sequenceBits: 10,
-                    timestampBitshift: 10,
+                    groupsBits: 10,
+                    timestampBitshift: 0,
                 ),
             ),
-            encoder: new \Pvmlibs\FlexId\Encoders\PseudoRandomEncoder(),
+            encoder: new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder(),
             encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
                 secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
-                serializer: new \Pvmlibs\FlexId\Encrypters\Serializers\NativeSerializer(),
+                serializer: new NativeSerializer(),
             ),
+            signer: new Signer(new NativeSerializer(), 'PsQBSNyMoz60RpQnSKWBMg=='),
         );
         $this::assertNotEmpty($idDistribution->presentation());
     }

@@ -2,16 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Pvmlibs\FlexId\Encrypters\Serializers;
+namespace Pvmlibs\FlexId\Serializers;
 
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 
 /**
  * Don't require any extensions but supports only alphabet with power of 2 length.
- * It's recommended to set you own shuffled version of the alphabet (e.g. with str_shuffle() and offset).
+ * It's recommended to set shuffled version of the alphabet (e.g. with str_shuffle()) or use your own.
+ * Fastest serializer.
  */
 class NativeSerializer implements SerializerContract
 {
+    use HasSerializerMaxOutput;
+
     private readonly int $alphabetLength;
     private readonly int $alphabetBits;
 
@@ -19,11 +22,12 @@ class NativeSerializer implements SerializerContract
 
     /**
      * 32 chars, shuffled alphabet with removed common vowels and digits to lower probability of building random words.
+     * Max 13 chars output length.
      */
     public const SAFE_ALPHABET = 'FDxkwdMKQRGgCBPLpYmvVJyXZbjczWqf';
 
     /**
-     * Shuffled 64 chars, a-zA-Z0-9-_.
+     * Shuffled 64 chars, a-zA-Z0-9-_. This can create random words, max 11 chars output length.
      */
     public const EXTENDED_ALPHABET = 'R9jHJSAcLBfFroKqTzXvgxtNbsp83DEkVMIn-y0m5hdG_P47awQl26uYZUeW1iCO';
 
@@ -49,14 +53,8 @@ class NativeSerializer implements SerializerContract
             throw new \InvalidArgumentException('Alphabet must not contain multi byte characters');
         }
 
-        $startLength = $this->alphabetLength;
-        $bits = 0;
-        do {
-            $bits++;
-        } while (($startLength >>= 1) > 1);
-
-        $this->alphabetBits = $bits;
-        $this->maxLength = $this->getMaxEncodedLength();
+        $this->alphabetBits = \intval(log($this->alphabetLength, 2));
+        $this->maxLength = $this->maxOutputs[\strlen($alphabet)];
     }
 
     public function serialize(array $data): string
@@ -85,13 +83,13 @@ class NativeSerializer implements SerializerContract
             throw new IdDecodeException('Id has incorrect length');
         }
 
-        if ((int) \preg_match('/^[' . \preg_quote($this->alphabet, '/') . ']+$/', $data) === 0) {
-            throw new IdDecodeException('Id has invalid characters');
-        }
-
         $number = 0;
-        foreach (\str_split(\strrev($data)) as $char) {
-            $number = ($number << $this->alphabetBits) + \strpos($this->alphabet, $char); // @phpstan-ignore plus.rightNonNumeric (strpos can't be false)
+        for ($i = \strlen($data) - 1; $i >= 0; $i--) {
+            $index = \strpos($this->alphabet, $data[$i]);
+            if ($index === false) {
+                throw new IdDecodeException('Id has invalid characters');
+            }
+            $number = ($number << $this->alphabetBits) + $index;
         }
 
         $mask = ((1 << 16) - 1);
@@ -106,13 +104,16 @@ class NativeSerializer implements SerializerContract
 
     public function getMaxEncodedLength(): int
     {
-        return \strlen($this->serialize([
-            0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
-        ]));
+        return $this->maxLength;
     }
 
     public function getAlphabet(): string
     {
         return $this->alphabet;
+    }
+
+    public function isConstantLength(): bool
+    {
+        return false;
     }
 }
