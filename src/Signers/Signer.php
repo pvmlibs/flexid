@@ -28,7 +28,7 @@ class Signer implements SignerContract
      * @param string $separator     In variable length sign used to separate id part from sign with separator.
      *                              If empty and serializer is constant length or maxSignLength = 1 it will take accordingly last
      *                              16 or 1 chars to verify sign. When serializer is not constant length then it assumes
-     *                              that id is (always 16 chars) and starts from 17th char to the end.
+     *                              that id is <b>(always 16 chars)</b> and starts from 17th char to the end.
      * @param int    $maxSignLength Limit sign up to that many characters. This lowers security, 16 is max. In some cases
      *                              when still want the shortest possible id, it may just work like crc when maxSignLength = 1
      *                              and empty separator
@@ -45,7 +45,7 @@ class Signer implements SignerContract
     ) {
         $decodedSecret = \base64_decode($key, true);
 
-        if ($decodedSecret === false || strlen($decodedSecret) < 16) {
+        if ($decodedSecret === false || \strlen($decodedSecret) < 16) {
             throw new \InvalidArgumentException(\sprintf('Secret key is invalid. Ensure it is base64 encoded string and is at least 16 bytes long.'));
         }
 
@@ -91,8 +91,8 @@ class Signer implements SignerContract
         }
 
         if ($this->separator === '' && $this->serializer->isConstantLength() === false
-        && $this->maxSignLength > 1 && strlen($data) !== 16) {
-            throw new IdSigningException('Id must be 16 characters if no separator is used');
+        && $this->maxSignLength > 1 && \strlen($data) !== 16) {
+            throw new IdSigningException('Id must be 16 characters if no separator is used and signer serializer is variable length');
         }
 
         $hash = ($this->signFn)($data);
@@ -110,6 +110,15 @@ class Signer implements SignerContract
 
     public function getIdFromSigned(string $idWithSign): string
     {
+        if ($idWithSign === '') {
+            throw new IdVerifySignException('Id is empty');
+        }
+
+        if (\strlen($idWithSign) > 33) {
+            // max 16 id, 16 sign + separator
+            throw new IdVerifySignException('Id is too long ' . $idWithSign);
+        }
+
         if ($this->separator !== '') {
             // find separator pos from the end
             $separatorPos = \strrpos($idWithSign, $this->separator);
@@ -119,7 +128,7 @@ class Signer implements SignerContract
             $signPartPos = $separatorPos + 1;
         } else {
             if ($this->serializer->isConstantLength() || $this->maxSignLength === 1) {
-                $separatorPos = $signPartPos = strlen($idWithSign) - min(16, $this->maxSignLength);
+                $separatorPos = $signPartPos = \strlen($idWithSign) - min(16, $this->maxSignLength);
             } else {
                 // assume id has constant length
                 $separatorPos = $signPartPos = 16;
@@ -134,5 +143,10 @@ class Signer implements SignerContract
         }
 
         return $id;
+    }
+
+    public function getSerializer(): SerializerContract
+    {
+        return $this->serializer;
     }
 }

@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Encoders;
+namespace Tests\Encoders;
 
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Encoders\FixedLengthEncoder;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
-use Tests\Encoders\HasEncoderTesting;
+use Tests\Internal\HasBackwardCompatibilityTesting;
+use Tests\Internal\HasIdCharDistributionTesting;
 
 /**
  * @internal
@@ -16,6 +17,8 @@ use Tests\Encoders\HasEncoderTesting;
 final class FixedLengthEncoderTest extends TestCase
 {
     use HasEncoderTesting;
+    use HasIdCharDistributionTesting;
+    use HasBackwardCompatibilityTesting;
 
     public function testWithDefaultAlphabet(): void
     {
@@ -89,5 +92,25 @@ final class FixedLengthEncoderTest extends TestCase
     {
         $encoder = new FixedLengthEncoder();
         $this::assertTrue($encoder->isConstantLength());
+    }
+
+    public function testEvenCharsDistribution(): void
+    {
+        $encoder = new FixedLengthEncoder();
+
+        $total = 1000;
+        $ids = new \SplFixedArray($total);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[$i] = $encoder->encode(random_int(0, PHP_INT_MAX));
+        }
+        $maxDeviations = $this->getMaxDeviation($ids, $encoder->getAlphabet());
+        // max deviation 5 times as random one from mean
+        $this::assertLessThan($maxDeviations['random'] * 5, $maxDeviations['real']);
+    }
+
+    public function testBackwardCompatibility(): void
+    {
+        $encoder = new FixedLengthEncoder();
+        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->encode($id), PHP_INT_MAX, 'FixedLengthEncoder');
     }
 }

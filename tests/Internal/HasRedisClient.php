@@ -6,7 +6,7 @@ namespace Tests\Internal;
 
 use Predis\Client;
 
-trait hasRedisClient
+trait HasRedisClient
 {
     private function getRedisClient(): \Redis
     {

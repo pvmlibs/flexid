@@ -113,7 +113,7 @@ class IdStats
                 $currentYear = $now + $yearDelta;
                 $yearMicroseconds = $yearDelta * 12 * 30 * 24 * 60 * 60 * 1_000_000;
                 try {
-                    $id = $generator->idInTime(\intval(\microtime(true) * 1_000_000) + $yearMicroseconds);
+                    $id = $generator->idInTime((int) (\microtime(true) * 1_000_000) + $yearMicroseconds);
                     $encoded = $this->encoder?->encode($id);
                     $encrypted = $this->encrypter?->encrypt($id);
                 } catch (IdGeneratorException) {
@@ -171,7 +171,7 @@ class IdStats
 
         // adjust testing range for id generation to make more sense in continuous context
         $resolverConfig = $this->generator->workerResolver->getConfiguration();
-        $maxThroughput = \intval($resolverConfig->maxWorkers * $resolverConfig->maxSequence * (1e9 / $resolverConfig->timestepNs));
+        $maxThroughput = (int) ($resolverConfig->maxWorkers * $resolverConfig->maxSequence * (1e9 / $resolverConfig->timestepNs));
         $idGenTotal = \max(\intdiv($maxThroughput, 10_000), $total);
 
         $results = [

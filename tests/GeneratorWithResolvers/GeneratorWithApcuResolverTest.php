@@ -9,14 +9,14 @@ use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\ApcuTimestepWorkerResolver;
 use Pvmlibs\FlexId\Resolvers\ShortApcuTimestepWorkerResolver;
-use Tests\Internal\hasRedisClient;
+use Tests\Internal\HasRedisClient;
 
 /**
  * @internal
  */
 final class GeneratorWithApcuResolverTest extends TestCase
 {
-    use hasRedisClient;
+    use HasRedisClient;
 
     public function testGenerate(): void
     {

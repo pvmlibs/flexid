@@ -10,14 +10,14 @@ use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\RedisReservedWorkerResolver;
 use Pvmlibs\FlexId\Resolvers\ShortRedisReservedWorkerResolver;
-use Tests\Internal\hasRedisClient;
+use Tests\Internal\HasRedisClient;
 
 /**
  * @internal
  */
 final class GeneratorWithRedisReservedResolverTest extends TestCase
 {
-    use hasRedisClient;
+    use HasRedisClient;
 
     public function testGenerate(): void
     {

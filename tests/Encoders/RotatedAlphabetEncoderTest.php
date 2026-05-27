@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
+use Tests\Internal\HasBackwardCompatibilityTesting;
+use Tests\Internal\HasIdCharDistributionTesting;
 
 /**
  * @internal
@@ -15,6 +17,8 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 final class RotatedAlphabetEncoderTest extends TestCase
 {
     use HasEncoderTesting;
+    use HasIdCharDistributionTesting;
+    use HasBackwardCompatibilityTesting;
 
     public function testWithDefaultAlphabet(): void
     {
@@ -110,5 +114,33 @@ final class RotatedAlphabetEncoderTest extends TestCase
             }
         }
         $this::assertEquals(0, $similar);
+    }
+
+    public function testEvenCharsDistribution(): void
+    {
+        $encoder = new RotatedAlphabetEncoder();
+
+        $total = \strlen($encoder->getAlphabet()) * 10;
+        $ids = new \SplFixedArray($total);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[$i] = $encoder->encode($i + 1000000);
+        }
+        // this should have perfect distribution as total ids are exact multiply of alphabet length
+        $this::assertSame(0.0, $this->getMaxDeviation($ids, $encoder->getAlphabet())['real']);
+
+        $total = 1000;
+        $ids = new \SplFixedArray($total);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[$i] = $encoder->encode(\random_int(0, PHP_INT_MAX));
+        }
+        $maxDeviations = $this->getMaxDeviation($ids, $encoder->getAlphabet());
+        // max deviation 5 times as random one
+        $this::assertLessThan($maxDeviations['random'] * 5, $maxDeviations['real']);
+    }
+
+    public function testBackwardCompatibility(): void
+    {
+        $encoder = new RotatedAlphabetEncoder();
+        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->encode($id), PHP_INT_MAX, 'RotatedAlphabetEncoder');
     }
 }

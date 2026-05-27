@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pvmlibs\FlexId\Serializers;
 
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
+use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
 /**
  * Don't require any extensions but supports only alphabet with power of 2 length.
@@ -53,12 +54,16 @@ class NativeSerializer implements SerializerContract
             throw new \InvalidArgumentException('Alphabet must not contain multi byte characters');
         }
 
-        $this->alphabetBits = \intval(log($this->alphabetLength, 2));
+        $this->alphabetBits = (int) log($this->alphabetLength, 2);
         $this->maxLength = $this->maxOutputs[\strlen($alphabet)];
     }
 
     public function serialize(array $data): string
     {
+        if ($data[0] > 0xFFFF || $data[1] > 0xFFFF || $data[2] > 0xFFFF || $data[3] > 0xFFFF) {
+            throw new IdEncodeException('Out of range value for serializer');
+        }
+
         $mask = (1 << $this->alphabetBits) - 1;
         $reminder = $data[0] & $mask;
         $quotient = ($data[0] >> $this->alphabetBits)
@@ -66,12 +71,12 @@ class NativeSerializer implements SerializerContract
             | ($data[2] << 32 - $this->alphabetBits)
             | ($data[3] << 48 - $this->alphabetBits);
 
-        $result = \substr($this->alphabet, $reminder, 1);
+        $result = $this->alphabet[$reminder];
 
         while ($quotient > 0) {
             $reminder = $quotient & $mask;
             $quotient >>= $this->alphabetBits;
-            $result .= \substr($this->alphabet, $reminder, 1);
+            $result .= $this->alphabet[$reminder];
         }
 
         return $result;
@@ -89,10 +94,10 @@ class NativeSerializer implements SerializerContract
             if ($index === false) {
                 throw new IdDecodeException('Id has invalid characters');
             }
-            $number = ($number << $this->alphabetBits) + $index;
+            $number = ($number << $this->alphabetBits) | $index;
         }
 
-        $mask = ((1 << 16) - 1);
+        $mask = 0xFFFF;
 
         return [
             $number & $mask,

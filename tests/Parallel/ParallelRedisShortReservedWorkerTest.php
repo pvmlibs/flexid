@@ -7,18 +7,17 @@ namespace Tests\Parallel;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\ShortRedisReservedWorkerResolver;
-use Tests\Internal\hasRedisClient;
+use Tests\Internal\HasRedisClient;
 
 /**
  * @internal
  */
 final class ParallelRedisShortReservedWorkerTest extends TestCase
 {
-    use hasRedisClient;
+    use HasRedisClient;
 
     public function testConcurrentGenerators(): void
     {
-        // $this->markTestSkipped('must be revisited.');
         $this->generate(2, 1000, workersBits: 0, sequenceBits: 11, timestampShift: 14, ttl: 200); // timestep 33ms x 2048 -> 64k/worker/s
         $this->generate(4, 200, workersBits: 4, sequenceBits: 7, timestampShift: 14, ttl: 1000); // timestep 33ms x 128 -> 4k/worker/s
         $this->generate(4, 200, workersBits: 3, sequenceBits: 7, timestampShift: 17, ttl: 200); // timestep 134ms x 128 -> 1k/worker/s

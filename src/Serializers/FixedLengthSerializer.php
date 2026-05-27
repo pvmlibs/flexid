@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pvmlibs\FlexId\Serializers;
 
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
+use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
 /**
  * Provides fixed-length output with 16-characters alphabet.
@@ -44,9 +45,13 @@ class FixedLengthSerializer implements SerializerContract
     {
         $output = '';
 
-        for ($i = 0; $i < 4; $i++) {
-            for ($b = 12; $b >= 0; $b -= 4) {
-                $output .= \substr($this->alphabet, ($data[$i] >> $b) & 15, 1);
+        if ($data[0] > 0xFFFF || $data[1] > 0xFFFF || $data[2] > 0xFFFF || $data[3] > 0xFFFF) {
+            throw new IdEncodeException('Out of range value for serializer');
+        }
+
+        for ($i = 0; $i < 4; $i++) { // 4 x 16 bits
+            for ($b = 12; $b >= 0; $b -= 4) { // each 4 bits in word
+                $output .= $this->alphabet[($data[$i] >> $b) & 15];
             }
         }
 

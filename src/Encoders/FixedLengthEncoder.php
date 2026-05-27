@@ -50,7 +50,7 @@ class FixedLengthEncoder implements EncoderContract
 
         $output = '';
         for ($i = 60; $i >= 0; $i -= 4) {
-            $output .= \substr($this->alphabet, ($id >> $i) & 15, 1);
+            $output .= $this->alphabet[($id >> $i) & 15];
         }
 
         return $output;

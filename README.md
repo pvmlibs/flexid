@@ -155,10 +155,11 @@ $generator = new \Pvmlibs\FlexId\FlexIdGenerator(
 );
 $encoder = new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder();
 
-// using helper container, can also use signer property when want to sign encoded id
+// using helper container
 $encodedId = new \Pvmlibs\FlexId\EncodedId(
    flexIdGenerator: $generator,
    encoder: $encoder,
+   // signer: use SignerContract if id should be also signed
 );
 
 $id = $encodedId->generateId(); // 43581127276918784
@@ -183,10 +184,11 @@ $encrypter = new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
     serializer: new \Pvmlibs\FlexId\Serializers\NativeSerializer()
 );
 
-// using helper container, can also use signer property when want to sign encrypted id
+// using helper container
 $encryptedId = new \Pvmlibs\FlexId\EncryptedId(
     flexIdGenerator: $generator,
     encrypter: $encrypter,
+    // signer: use SignerContract if id should be also signed
 );
 
 $id = $encryptedId->generateId(); // 43581127276918784
@@ -207,7 +209,9 @@ $signer = new \Pvmlibs\FlexId\Signers\Signer(
     key: \Pvmlibs\FlexId\Signers\Signer::generateKey(), // use your own key
     hashAlgo: 'siphash-2-4', // default
     separator: '', // without separator
-    maxSignLength: 1);
+    maxSignLength: 1,
+    salt: '', // can add additional salt for hashing id
+    );
 
 $id = 'r8BnZxS';
 $signed = $signer->getSignedId($id); // r8BnZxSQ
@@ -224,6 +228,14 @@ $signer = new \Pvmlibs\FlexId\Signers\Signer(
 
 $id = 'r8BnZxS';
 $signed = $signer->getSignedId($id); // r8BnZxS-DwJgwJWVxfJdx
+
+// other examples of signed id
+// encrypted id + full length sign, variable length serializers
+// mSG3m1mRjg47.NpBb729yPXt
+// encrypted id with variable length serializer + full length sign with fixed length, no separator
+// P51GFcjTmJmxPBFFQGxRKdwkwgxQ
+// encrypted id + full length sign, fixed length serializers, no separator, always 32 chars
+// gMGgRwkPxCDLRkBdCLwDgGDgwRLCPkCd
 ```
 
 Backfill ID using Unix timestamp in microseconds. Make sure max sequence is enough for given timestep, sort timestamps

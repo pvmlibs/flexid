@@ -7,14 +7,14 @@ namespace Tests\Parallel;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\RandomWorkerResolver;
-use Tests\Internal\hasRedisClient;
+use Tests\Internal\HasRedisClient;
 
 /**
  * @internal
  */
 final class ParallelRandomWorkerTest extends TestCase
 {
-    use hasRedisClient;
+    use HasRedisClient;
 
     public function testConcurrentGenerators(): void
     {

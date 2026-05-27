@@ -11,12 +11,17 @@ use Pvmlibs\FlexId\Serializers\BCMathSerializer;
 use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
 use Pvmlibs\FlexId\Serializers\GMPSerializer;
 use Pvmlibs\FlexId\Serializers\NativeSerializer;
+use Tests\Internal\HasBackwardCompatibilityTesting;
+use Tests\Internal\HasIdCharDistributionTesting;
 
 /**
  * @internal
  */
 final class Sparx64EncrypterTest extends TestCase
 {
+    use HasIdCharDistributionTesting;
+    use HasBackwardCompatibilityTesting;
+
     public function testEncryptDecryptWithBCMathSerializer(): void
     {
         $secret = Sparx64Encrypter::generateSecret();
@@ -82,5 +87,25 @@ final class Sparx64EncrypterTest extends TestCase
         $encrypter = new Sparx64Encrypter(secret: $secret, serializer: new BCMathSerializer());
         $this->expectException(IdEncodeException::class);
         $encrypter->encrypt(-1);
+    }
+
+    public function testEvenCharsDistribution(): void
+    {
+        $encrypter = new Sparx64Encrypter(secret: 'rCl29//aZ51LjLQZKUbMUA==', serializer: new FixedLengthSerializer());
+
+        $total = 1000;
+        $ids = new \SplFixedArray($total);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[$i] = $encrypter->encrypt(\random_int(0, PHP_INT_MAX));
+        }
+        $maxDeviations = $this->getMaxDeviation($ids, $encrypter->getSerializer()->getAlphabet());
+        // should be close to random, max deviation 2 times as random one from mean
+        $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
+    }
+
+    public function testBackwardCompatibility(): void
+    {
+        $encrypter = new Sparx64Encrypter(secret: 'rCl29//aZ51LjLQZKUbMUA==', serializer: new BCMathSerializer());
+        $this->validateBackwardCompatibility(fn (int $id): string => $encrypter->encrypt($id), PHP_INT_MAX, 'Sparx64Encrypter');
     }
 }

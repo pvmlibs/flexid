@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Predis\Client;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver;
-use Tests\Internal\hasRedisClient;
+use Tests\Internal\HasRedisClient;
 
 /**
  * @covers \Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver
@@ -17,7 +17,7 @@ use Tests\Internal\hasRedisClient;
  */
 final class RedisTimestepWorkerResolverTest extends TestCase
 {
-    use hasRedisClient;
+    use HasRedisClient;
 
     public function testWorkerResolver(): void
     {

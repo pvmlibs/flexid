@@ -7,6 +7,8 @@ namespace Tests\Serializers;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
+use Tests\Internal\HasBackwardCompatibilityTesting;
+use Tests\Internal\HasIdCharDistributionTesting;
 
 /**
  * @internal
@@ -14,6 +16,8 @@ use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
 final class FixedLengthSerializerTest extends TestCase
 {
     use HasSerializerTesting;
+    use HasIdCharDistributionTesting;
+    use HasBackwardCompatibilityTesting;
 
     public function testSerializeDeserializeWithDefaultAlphabet(): void
     {
@@ -57,5 +61,35 @@ final class FixedLengthSerializerTest extends TestCase
     {
         $serializer = new FixedLengthSerializer();
         $this::assertTrue($serializer->isConstantLength());
+    }
+
+    public function testEvenCharsDistribution(): void
+    {
+        $encoder = new FixedLengthSerializer();
+
+        $total = 1000;
+        $ids = new \SplFixedArray($total);
+        for ($i = 0; $i < $total; $i++) {
+            $ids[$i] = $encoder->serialize([
+                \random_int(0, 0xFFFF),
+                \random_int(0, 0xFFFF),
+                \random_int(0, 0xFFFF),
+                \random_int(0, 0xFFFF),
+            ]);
+        }
+        $maxDeviations = $this->getMaxDeviation($ids, $encoder->getAlphabet());
+        // max deviation 2 times as random one from mean
+        $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
+    }
+
+    public function testBackwardCompatibility(): void
+    {
+        $encoder = new FixedLengthSerializer();
+        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->serialize([
+            $id,
+            $id,
+            $id,
+            $id,
+        ]), 0xFFFF, 'FixedLengthSerializer');
     }
 }

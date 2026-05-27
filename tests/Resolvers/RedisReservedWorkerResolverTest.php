@@ -9,7 +9,7 @@ use Predis\Client;
 use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\Resolvers\RedisReservedWorkerResolver;
-use Tests\Internal\hasRedisClient;
+use Tests\Internal\HasRedisClient;
 
 /**
  * @covers \Pvmlibs\FlexId\Resolvers\RedisReservedWorkerResolver
@@ -18,7 +18,7 @@ use Tests\Internal\hasRedisClient;
  */
 final class RedisReservedWorkerResolverTest extends TestCase
 {
-    use hasRedisClient;
+    use HasRedisClient;
 
     public function testWorkerResolve(): void
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Serializers;
 
+use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 use Pvmlibs\FlexId\Serializers\SerializerContract;
 
 trait HasSerializerTesting
@@ -53,5 +54,8 @@ trait HasSerializerTesting
         $encoded = $serializer->serialize($maxId);
         $this::assertSame($maxId, $serializer->deserialize($encoded));
         $this::assertSame(\strlen($encoded), $serializer->getMaxEncodedLength());
+
+        $this::expectException(IdEncodeException::class);
+        $serializer->serialize([0xFFFF + 1, 0, 0, 0]);
     }
 }

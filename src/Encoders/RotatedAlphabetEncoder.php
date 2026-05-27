@@ -62,7 +62,12 @@ class RotatedAlphabetEncoder implements EncoderContract
             throw new \InvalidArgumentException('Alphabet must not contain multi byte characters');
         }
 
-        $this->unrolledAlphabet = $this->alphabet . $this->alphabet;
+        if ($offset < 0 || $this->offset >= $alphabetLength) {
+            throw new \InvalidArgumentException("Offset mus be within <0, {$alphabetLength})");
+        }
+
+        // unroll to allow operating without modulus
+        $this->unrolledAlphabet = $this->alphabet . $this->alphabet . $this->alphabet;
         $this->maxEncodedLength = $this->maxOutputs[$alphabetLength];
     }
 
@@ -73,18 +78,17 @@ class RotatedAlphabetEncoder implements EncoderContract
         }
 
         $alphabetLength = \strlen($this->alphabet);
-        $quotient = $id;
 
-        $reminder = $quotient % $alphabetLength;
-        $quotient = \intdiv($quotient, $alphabetLength);
+        $reminder = $id % $alphabetLength;
+        $quotient = \intdiv($id, $alphabetLength);
 
-        $output = \substr($this->alphabet, $reminder, 1);
-        $rotate = ($reminder + $this->offset) % $alphabetLength;
+        $output = $this->alphabet[$reminder];
+        $rotate = $reminder + $this->offset;
 
         while ($quotient > 0) {
             $reminder = $quotient % $alphabetLength;
             $quotient = \intdiv($quotient, $alphabetLength);
-            $output .= \substr($this->unrolledAlphabet, $rotate + $reminder, 1);
+            $output .= $this->unrolledAlphabet[$rotate + $reminder];
         }
 
         return $output;

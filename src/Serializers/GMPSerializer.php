@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pvmlibs\FlexId\Serializers;
 
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
+use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
 /**
  * This class needs gmp extension. Supports custom length alphabet so could provide smaller output than NativeSerializer.
@@ -56,26 +57,36 @@ class GMPSerializer implements SerializerContract
 
     public function serialize(array $data): string
     {
+        if ($data[0] > 0xFFFF || $data[1] > 0xFFFF || $data[2] > 0xFFFF || $data[3] > 0xFFFF) {
+            throw new IdEncodeException('Out of range value for serializer');
+        }
+
+        $alphabetLength = \strlen($this->alphabet);
+
         $num = $data[0];
         $num |= $data[1] << 16;
         $num |= $data[2] << 32;
-        $num = \gmp_add($num, \gmp_mul($data[3], 281474976710656)); // num2 1 << 48
 
-        $alphabetLength = \strlen($this->alphabet);
-        $quotient = $num;
+        if (($data[3] & 32768) > 0) {
+            // needs 64 bits so use bcmath
+            $num = \gmp_add($num, \gmp_mul($data[3], 281474976710656)); // num2 1 << 48
+            [$quotient, $reminder] = \gmp_div_qr($num, $alphabetLength); // @phpstan-ignore offsetAccess.nonArray
+            $quotient = (int) gmp_strval($quotient);
+            $reminder = (int) gmp_strval($reminder);
+        } else {
+            // when last bit is not set then we can fit the number in 63 bit and process it directly
+            $num |= $data[3] << 48;
+            $reminder = $num % $alphabetLength;
+            $quotient = \intdiv($num, $alphabetLength);
+        }
 
-        // do first round with gmp
-        [$quotient, $reminder] = \gmp_div_qr($quotient, $alphabetLength); // @phpstan-ignore offsetAccess.nonArray
-
-        $quotient = \intval(gmp_strval($quotient));
-        $reminder = \intval(gmp_strval($reminder));
-        $result = \substr($this->alphabet, $reminder, 1);
+        $result = $this->alphabet[$reminder];
 
         while ($quotient > 0) {
             $reminder = $quotient % $alphabetLength;
             $quotient = \intdiv($quotient, $alphabetLength);
 
-            $result .= \substr($this->alphabet, $reminder, 1);
+            $result .= $this->alphabet[$reminder];
         }
 
         return $result;
@@ -103,16 +114,23 @@ class GMPSerializer implements SerializerContract
         if ($index === false) {
             throw new IdDecodeException('Id has invalid characters');
         }
-        $number = \gmp_add(\gmp_mul($number, $alphabetLength), $index); // @phpstan-ignore argument.type (this can't be false)
 
-        // num2 1 << 16
-        [$quotient, $reminder] = \gmp_div_qr($number, 65536); // @phpstan-ignore offsetAccess.nonArray
-        $quotient = (int) $quotient;
-
-        $mask = ((1 << 16) - 1);
+        $mask = 0xFFFF;
+        $numberInt = $number * $alphabetLength + $index;
+        if (is_float($numberInt) === false) { // @phpstan-ignore function.impossibleType,identical.alwaysTrue (this can be float)
+            // we're still in signed int range, can go without gmp
+            $reminder = $numberInt & $mask;
+            $quotient = $numberInt >> 16;
+        } else {
+            $number = \gmp_add(\gmp_mul($number, $alphabetLength), $index); // @phpstan-ignore argument.type (this can't be false)
+            // num2 1 << 16
+            [$quotient, $reminder] = \gmp_div_qr($number, 65536); // @phpstan-ignore offsetAccess.nonArray
+            $quotient = (int) $quotient;
+            $reminder = (int) $reminder;
+        }
 
         return [
-            (int) $reminder,
+            $reminder,
             $quotient & $mask,
             ($quotient >> 16) & $mask,
             ($quotient >> 32) & $mask,

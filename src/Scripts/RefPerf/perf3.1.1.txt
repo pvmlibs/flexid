@@ -1,0 +1,17 @@
+FlexIdGenerator                    2,082,128 ops/s
+RotatedAlphabetEncoder encode      1,186,133 ops/s
+RotatedAlphabetEncoder decode      899,093 ops/s
+FixedLengthEncoder encode          1,274,065 ops/s
+FixedLengthEncoder decode          865,966 ops/s
+NativeSerializer serialize         1,091,411 ops/s
+NativeSerializer deserialize       893,242 ops/s
+BCMathSerializer serialize         741,749 ops/s
+BCMathSerializer deserialize       714,096 ops/s
+GMPSerializer serialize            671,582 ops/s
+GMPSerializer deserialize          796,930 ops/s
+FixedLengthSerializer serialize    914,621 ops/s
+FixedLengthSerializer deserialize  853,242 ops/s
+Sparx64Encrypter encrypt           77,513 ops/s
+Sparx64Encrypter decrypt           84,648 ops/s
+Signer sign                        509,601 ops/s
+Signer verify                      472,789 ops/s

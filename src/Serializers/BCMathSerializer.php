@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pvmlibs\FlexId\Serializers;
 
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
+use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
 /**
  * This class needs bc-math extension. Supports custom length alphabet so could provide smaller output than NativeSerializer.
@@ -56,26 +57,36 @@ class BCMathSerializer implements SerializerContract
 
     public function serialize(array $data): string
     {
+        if ($data[0] > 0xFFFF || $data[1] > 0xFFFF || $data[2] > 0xFFFF || $data[3] > 0xFFFF) {
+            throw new IdEncodeException('Out of range value for serializer');
+        }
+
+        $alphabetLength = \strlen($this->alphabet);
+
         $num = $data[0];
         $num |= $data[1] << 16;
         $num |= $data[2] << 32;
-        $num = \bcadd((string) $num, \bcmul((string) $data[3], '281474976710656')); // num2 1 << 48
 
-        $alphabetLength = \strlen($this->alphabet);
-        $quotient = $num;
+        if (($data[3] & 32768) > 0) {
+            // needs 64 bits so use bcmath
+            $num = \bcadd((string) $num, \bcmul((string) $data[3], '281474976710656')); // num2 1 << 48
+            [$quotient, $reminder] = \bcdivmod($num, (string) $alphabetLength); // @phpstan-ignore offsetAccess.nonArray
+            $quotient = (int) $quotient;
+            $reminder = (int) $reminder;
+        } else {
+            // when last bit is not set then we can fit the number in 63 bit and process it directly
+            $num |= $data[3] << 48;
+            $reminder = $num % $alphabetLength;
+            $quotient = \intdiv($num, $alphabetLength);
+        }
 
-        // do first round with bc math
-        [$quotient, $reminder] = \bcdivmod($quotient, (string) $alphabetLength); // @phpstan-ignore offsetAccess.nonArray
-
-        $quotient = \intval($quotient);
-        $reminder = \intval($reminder);
-        $result = \substr($this->alphabet, $reminder, 1);
+        $result = $this->alphabet[$reminder];
 
         while ($quotient > 0) {
             $reminder = $quotient % $alphabetLength;
             $quotient = \intdiv($quotient, $alphabetLength);
 
-            $result .= \substr($this->alphabet, $reminder, 1);
+            $result .= $this->alphabet[$reminder];
         }
 
         return $result;
@@ -104,16 +115,23 @@ class BCMathSerializer implements SerializerContract
         if ($index === false) {
             throw new IdDecodeException('Id has invalid characters');
         }
-        $number = \bcadd(\bcmul((string) $number, (string) $alphabetLength), (string) $index); // @phpstan-ignore argument.type (this can't be false)
 
-        // num2 1 << 16
-        [$quotient, $reminder] = \bcdivmod($number, '65536'); // @phpstan-ignore offsetAccess.nonArray
-        $quotient = (int) $quotient;
-
-        $mask = ((1 << 16) - 1);
+        $mask = 0xFFFF;
+        $numberInt = $number * $alphabetLength + $index;
+        if (\is_float($numberInt) === false) { // @phpstan-ignore function.impossibleType,identical.alwaysTrue (this can be float)
+            // we're still in signed int range, can go without bcmath
+            $reminder = $numberInt & $mask;
+            $quotient = $numberInt >> 16;
+        } else {
+            $number = \bcadd(\bcmul((string) $number, (string) $alphabetLength), (string) $index); // @phpstan-ignore argument.type (this can't be false)
+            // num2 1 << 16
+            [$quotient, $reminder] = \bcdivmod($number, '65536'); // @phpstan-ignore offsetAccess.nonArray
+            $quotient = (int) $quotient;
+            $reminder = (int) $reminder;
+        }
 
         return [
-            (int) $reminder,
+            $reminder,
             $quotient & $mask,
             ($quotient >> 16) & $mask,
             ($quotient >> 32) & $mask,

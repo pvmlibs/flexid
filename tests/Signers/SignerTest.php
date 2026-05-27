@@ -11,6 +11,8 @@ use Pvmlibs\FlexId\Serializers\BCMathSerializer;
 use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
 use Pvmlibs\FlexId\Serializers\NativeSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
+use Tests\Internal\HasBackwardCompatibilityTesting;
+use Tests\Internal\HasIdCharDistributionTesting;
 
 /**
  * @internal
@@ -18,6 +20,8 @@ use Pvmlibs\FlexId\Signers\Signer;
 final class SignerTest extends TestCase
 {
     use HasSignerTesting;
+    use HasIdCharDistributionTesting;
+    use HasBackwardCompatibilityTesting;
 
     public function testWithSodiumSipHash(): void
     {
@@ -165,6 +169,16 @@ final class SignerTest extends TestCase
         $signer->getIdFromSigned('');
     }
 
+    public function testGetIdFromTooLongData(): void
+    {
+        $signer = new Signer(
+            serializer: new NativeSerializer(),
+            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+        );
+        $this->expectException(IdVerifySignException::class);
+        $signer->getIdFromSigned('djclaorhfncajkdths83jdneqm06ns84ae');
+    }
+
     public function testTamperWithId(): void
     {
         $signer = new Signer(
@@ -256,5 +270,35 @@ final class SignerTest extends TestCase
             separator: '-',
             maxSignLength: 0,
         );
+    }
+
+    public function testEvenCharsDistribution(): void
+    {
+        $signer = new Signer(
+            serializer: new FixedLengthSerializer(),
+            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            separator: '',
+        );
+
+        $total = 1000;
+        $ids = new \SplFixedArray($total);
+        for ($i = 0; $i < $total; $i++) {
+            $id = (string) random_int(0, PHP_INT_MAX);
+            $signedId = $signer->getSignedId($id);
+            $sign = \substr($signedId, \strlen($id));
+            $ids[$i] = $sign;
+        }
+        $maxDeviations = $this->getMaxDeviation($ids, $signer->getSerializer()->getAlphabet());
+        // sign chars should be close to random, max deviation 2 times as random one from mean
+        $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
+    }
+
+    public function testBackwardCompatibility(): void
+    {
+        $signer = new Signer(
+            serializer: new FixedLengthSerializer(),
+            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+        );
+        $this->validateBackwardCompatibility(fn (int $id): string => $signer->getSignedId((string) $id), PHP_INT_MAX, 'Signer');
     }
 }

@@ -7,6 +7,7 @@ namespace Tests\Serializers;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Serializers\GMPSerializer;
+use Tests\Internal\HasBackwardCompatibilityTesting;
 
 /**
  * @internal
@@ -14,6 +15,7 @@ use Pvmlibs\FlexId\Serializers\GMPSerializer;
 final class GMPSerializerTest extends TestCase
 {
     use HasSerializerTesting;
+    use HasBackwardCompatibilityTesting;
 
     public function testSerializeDeserializeWithDefaultAlphabet(): void
     {
@@ -65,9 +67,33 @@ final class GMPSerializerTest extends TestCase
         $serializer->deserialize('-');
     }
 
+    public function testBadCharactersInIdMiddle(): void
+    {
+        $serializer = new GMPSerializer();
+        $this->expectException(IdDecodeException::class);
+        $serializer->deserialize('Db-Db');
+    }
+
     public function testIsConstantLength(): void
     {
         $serializer = new GMPSerializer();
         $this::assertFalse($serializer->isConstantLength());
+    }
+
+    public function testGetAlphabet(): void
+    {
+        $serializer = new GMPSerializer('d7x3Db2LY5Qgv1k9wZFfKMCztc6n');
+        $this::assertSame('d7x3Db2LY5Qgv1k9wZFfKMCztc6n', $serializer->getAlphabet());
+    }
+
+    public function testBackwardCompatibility(): void
+    {
+        $encoder = new GMPSerializer();
+        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->serialize([
+            $id,
+            $id,
+            $id,
+            $id,
+        ]), 0xFFFF, 'GMPSerializer');
     }
 }
