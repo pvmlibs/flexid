@@ -22,7 +22,7 @@ class Sparx64Encrypter implements EncrypterContract
     public const K_SIZE = 4;
     public const SECRET_SIZE = 16;
 
-    /** @var array<int<0, 16>, list<int>> Subkeys for encryption/decryption. */
+    /** @var array<non-negative-int, list<int>> Subkeys for encryption/decryption. */
     private array $subkeys = [];
 
     /**
@@ -190,7 +190,7 @@ class Sparx64Encrypter implements EncrypterContract
     /**
      * Key permutation for 64/128 variant.
      *
-     * @param array<int<0, 7>, int> $key
+     * @param array<non-negative-int, int> $key
      */
     private function KPerm64128(array &$key, int $roundConstant): void
     {
@@ -207,9 +207,9 @@ class Sparx64Encrypter implements EncrypterContract
     }
 
     /**
-     * @param array<int<0, 7>, int> $masterKey
+     * @param array<non-negative-int, int> $masterKey
      *
-     * @return array<int<0, 16>, list<int>>
+     * @return array<non-negative-int, list<int>>
      */
     private function keySchedule(array &$masterKey): array
     {
