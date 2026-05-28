@@ -10,7 +10,6 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 /**
  * Don't require any extensions but supports only alphabet with power of 2 length.
  * It's recommended to set shuffled version of the alphabet (e.g. with str_shuffle()) or use your own.
- * Fastest serializer.
  */
 class NativeSerializer implements SerializerContract
 {

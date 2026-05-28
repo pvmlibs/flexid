@@ -60,7 +60,7 @@ class FixedLengthSerializer implements SerializerContract
 
     public function deserialize(string $data): array
     {
-        if ($data === '' || \strlen($data) > $this->maxLength) {
+        if (\strlen($data) !== $this->maxLength) {
             throw new IdDecodeException('Id has incorrect length');
         }
 

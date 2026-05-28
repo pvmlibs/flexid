@@ -6,13 +6,18 @@
 Features:
 - Generate unique ID on one or multiple nodes/processes. Workers management included for efficient ID pool usage
 - Encode integer ID for shorter strings/obfuscate integer ID with custom alphabet e.g. xzRYLSKxJH
-- Encrypt integer ID when need extra security, also produces shorter string e.g. mXjZKfmfXzwPw
-- Sign ID for integrity and authenticity, preventing tampering
+- Encrypt integer ID when need to publish it and want to safely hide the real value
+- Sign ID for integrity and authenticity, preventing tampering and enumeration
 - ID lifespan ranges from 292 to 292271 years
 - up to 1048576 workers
 - customizable generators for many different workflows
 
 Transforming tools (encoders, encrypters, signers) can also work with external ID, including ordinary autoincrement ID.
+They try to solve common problem with exposing internal ID from database to public. Usually applications use something
+like uuidv4/uuidv7/other random id which have impact on performance, memory usage and could also reveal information on id
+creation date (uuidv7).
+Now we can have performant integer ID in database and transform it to/from application on the fly, without storing
+transformed id.
 
 ## Requirements
 
@@ -73,18 +78,27 @@ lifespan. For more read [ID structure](docs/IdStructure.md)
    - RotatedAlphabetEncoder - recommended as default, ID are transformed using alphabet and rotation for obfuscation,
                               sequential ID looks random. Produces smallest possible encoded ID.
    - FixedLengthEncoder - ID are transformed to fixed, 16-chars string using provided alphabet.
+   - HexEncoder - uses only hexadecimal chars, but it's the fastest from encoders (by 3-6x)
 4. Encryptors - encrypts/decrypts ID.
    - Sparx64Encrypter - uses Sparx ARX-based block cipher than can transform ID to other 64-bit number that looks
       completely random and prevents reading back ID without secret key. Encrypted ID have to use serializer for printable
-      output:
-     - NativeSerializer - supports only power of 2 alphabet lengths but don't require any php extensions
-     - BCMathSerializer - supports any alphabet lengths and can produce slightly smaller output than NativeSerializer
+      output
+5. Serializers - transforms 64bits of data to string. Exists mainly because of PHP limitation of signed integer type.
+     - NativeSerializer - supports only power of 2 alphabet lengths but don't require any php extensions, uses custom
+                          alphabet
+     - BCMathSerializer - supports custom alphabet lengths and can produce slightly smaller output than NativeSerializer
      - GMPSerializer - same as and interoperable with BCMathSerializer
-     - FixedLengthSerializer - produces fixed, 16-chars output using provided alphabet
+     - FixedLengthSerializer - produces fixed, 16-chars output using provided custom alphabet
+     - HexSerializer - uses only hexadecimal chars, but it's the fastest from serializers (by 2-3x). Fixed length (16).
 5. Signers - sign ID using HMAC. It can ensure that ID comes from us and was not changed. Uses serializer for producing
    printable output. Sign is concatenated with ID with or without provided separator. It uses first 64 bits from hashing
    algorithm so max 16 characters for sign, according to used serializer and sign max length setting. Can also use as
-   simple crc with e.g. 1-character sign.
+   simple crc with e.g. 1-character sign, but then it's not a secure solution. Also, great for preventing ID enumeration.
+   There are two versions:
+     - Signer - customizable with different serializers and hash algorithms
+     - FastSigner - not customizable, hexadecimal output, uses only SipHash-2-4 hash. Faster by 2,5-3x from Signer with
+       the fastest serializer (HexSerializer)
+   
 
 ## Usage
 
@@ -147,7 +161,7 @@ Generate many ID more efficiently:
 $ids = $generator->bulkIds(1000); // array
 ```
 
-Generate ID with encoding. Encoders can be also used to encode/decode any integer number:
+Generate ID with encoding. Encoders can be also used to encode/decode any integer number (0 - PHP_INT_MAX):
 
 ```php
 $generator = new \Pvmlibs\FlexId\FlexIdGenerator(
@@ -172,7 +186,7 @@ $publicId = $encoder->encode($id); // sNy4hCLr4V
 $encoder->decode($publicId); // 43581127276918784
 ```
 
-Generate ID with encrypting. Encryptor can be also used to encrypt/decrypt any integer number:
+Generate ID with encrypting. Encryptor can be also used to encrypt/decrypt any integer number (0 - PHP_INT_MAX):
 
 ```php
 $generator = new \Pvmlibs\FlexId\FlexIdGenerator(
@@ -218,12 +232,12 @@ $signed = $signer->getSignedId($id); // r8BnZxSQ
 // get id from signed with validation
 $id = $signer->getIdFromSigned($signed); // r8BnZxS
 
-// for max security use max sign length
+// for max security use max sign length. For faster signing use FastSigner.
 $signer = new \Pvmlibs\FlexId\Signers\Signer(
     serializer: new \Pvmlibs\FlexId\Serializers\NativeSerializer(),
     key: \Pvmlibs\FlexId\Signers\Signer::generateKey(), // use your own key
     hashAlgo: 'siphash-2-4',
-    separator: '-' // when using FixedLengthSerializer there is no need to use separator
+    separator: '-' // when using FixedLengthSerializer or maxSignLength=1 there is no need to use separator
 );
 
 $id = 'r8BnZxS';
@@ -276,6 +290,7 @@ with very intensive ID generation, then you can make some other optimizations:
 
 ## Performance
 
+### ID generation
 This implementation provide performance benefits especially when generating lots of IDs. Below are results from 1
 generator generating 1M IDs in loop with id() method with different resolvers, 50us Redis round trip was applied.
 
@@ -294,3 +309,52 @@ useNewWorkerOnSequenceOverflow=true that's why number of Redis requests is much 
 still much less than in Snowflake implementation.
 
 Keep in mind that performance in burst generation very depends on bit configuration.
+
+### ID transforming tools
+From fastest, time for 100 operations - example scenario with transforming integer ID like in pagination results from DB.
+
+Security from the lowest: encoding, encoding + signing, encrypting, encrypting + signing
+
+Encoding:
+
+Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Time [ms]                       |                           0.021891|                           0.094979|                           0.095871|
+
+
+Encoding + signing ID (FastSigner, SipHash2-4) - fastest 64-bit sign:
+
+Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Time [ms]                       |                           0.047941|                           0.108535|                           0.115809|
+
+
+Encoding + signing ID (Signer, SipHash2-4, BCMathSerializer) - shortest 64-bit sign:
+
+Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Time [ms]                       |                           0.231167|                           0.270731|                           0.290789|
+
+
+Encrypting:
+
+Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Time [ms]                       |                           0.781154|                           0.823523|                           0.822301|                           0.860353|
+
+
+Encrypting + signing ID (FastSigner, SipHash2-4) - fastest 64-bit sign:
+
+Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Time [ms]                       |                           0.888096|                            0.86397|                           0.838332|                           0.889979|
+
+
+Encrypting + signing ID (Signer, SipHash2-4, BCMathSerializer) - shortest 64-bit sign:
+
+Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Time [ms]                       |                           0.966063|                           1.023381|                           1.004565|                           1.060731|
+
+Even with the most secure solution (encrypt + sign) we can go under 1ms per page with 100 ids. Example outputs from above
+transformations are also shown in [ID overview](docs/IdOverview.md).

@@ -7,7 +7,6 @@ namespace Pvmlibs\FlexId\Signers;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 use Pvmlibs\FlexId\Exceptions\IdSigningException;
 use Pvmlibs\FlexId\Exceptions\IdVerifySignException;
-use Pvmlibs\FlexId\Serializers\SerializerContract;
 
 interface SignerContract
 {
@@ -21,5 +20,5 @@ interface SignerContract
      */
     public function getIdFromSigned(string $idWithSign): string;
 
-    public function getSerializer(): SerializerContract;
+    public function getAlphabet(): string;
 }

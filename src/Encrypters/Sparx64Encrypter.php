@@ -60,7 +60,7 @@ class Sparx64Encrypter implements EncrypterContract
             throw new IdEncodeException('Encrypted ID must be positive.');
         }
 
-        $mask = ((1 << 16) - 1);
+        $mask = 0xFFFF;
         $x = [
             $id & $mask,
             ($id >> 16) & $mask,
@@ -71,30 +71,45 @@ class Sparx64Encrypter implements EncrypterContract
         $k = $this->subkeys;
         for ($s = 0; $s < self::N_STEPS; $s++) {
             for ($b = 0; $b < self::N_BRANCHES; $b++) {
-                for ($r = 0; $r < self::ROUNDS_PER_STEP; $r++) {
-                    $x[2 * $b] ^= $k[self::N_BRANCHES * $s + $b][2 * $r];
-                    $x[2 * $b + 1] ^= $k[self::N_BRANCHES * $s + $b][2 * $r + 1];
+                $subkeyItem = $k[self::N_BRANCHES * $s + $b];
+                $bmul2 = $b << 1;
+                $xb = $x[$bmul2];
+                $xb1 = $x[$bmul2 + 1];
 
-                    $l2 = (($x[2 * $b] << 9) | ($x[2 * $b] >> 7)) & 0xFFFF;
-                    $l2 = ($l2 + $x[2 * $b + 1]) & 0xFFFF;
-                    $r2 = (($x[2 * $b + 1] << 2) | ($x[2 * $b + 1] >> 14)) & 0xFFFF;
+                for ($r = 0; $r < self::ROUNDS_PER_STEP; $r++) {
+                    $rmul2 = $r << 1;
+                    $xb ^= $subkeyItem[$rmul2];
+                    $xb1 ^= $subkeyItem[$rmul2 + 1];
+
+                    $l2 = (($xb << 9) | ($xb >> 7)) & 0xFFFF;
+                    $l2 = ($l2 + $xb1) & 0xFFFF;
+                    $r2 = (($xb1 << 2) | ($xb1 >> 14)) & 0xFFFF;
                     $r2 ^= $l2;
 
-                    $x[2 * $b] = $l2;
-                    $x[2 * $b + 1] = $r2;
+                    $xb = $l2;
+                    $xb1 = $r2;
                 }
+                $x[$bmul2] = $xb;
+                $x[$bmul2 + 1] = $xb1;
             }
 
             $tmp = ((($x[0] ^ $x[1]) << 8) | (($x[0] ^ $x[1]) >> 8)) & 0xFFFF;
             $x[2] ^= $x[0] ^ $tmp;
             $x[3] ^= $x[1] ^ $tmp;
-            [$x[0], $x[2]] = [$x[2], $x[0]];
-            [$x[1], $x[3]] = [$x[3], $x[1]];
+
+            $tmp = $x[0];
+            $x[0] = $x[2];
+            $x[2] = $tmp;
+            $tmp = $x[1];
+            $x[1] = $x[3];
+            $x[3] = $tmp;
         }
 
         for ($b = 0; $b < self::N_BRANCHES; $b++) {
-            $x[2 * $b] ^= $k[self::N_BRANCHES * self::N_STEPS][2 * $b];
-            $x[2 * $b + 1] ^= $k[self::N_BRANCHES * self::N_STEPS][2 * $b + 1];
+            $bmul2 = $b << 1;
+            $subkeyItem = $k[self::N_BRANCHES * self::N_STEPS];
+            $x[$bmul2] ^= $subkeyItem[$bmul2];
+            $x[$bmul2 + 1] ^= $subkeyItem[$bmul2 + 1];
         }
 
         return $this->serializer->serialize($x);
@@ -106,32 +121,44 @@ class Sparx64Encrypter implements EncrypterContract
         $k = $this->subkeys;
 
         for ($b = 0; $b < self::N_BRANCHES; $b++) {
-            $x[2 * $b] ^= $k[self::N_BRANCHES * self::N_STEPS][2 * $b];
-            $x[2 * $b + 1] ^= $k[self::N_BRANCHES * self::N_STEPS][2 * $b + 1];
+            $bmul2 = $b << 1;
+            $subkeyItem = $k[self::N_BRANCHES * self::N_STEPS];
+            $x[$bmul2] ^= $subkeyItem[$bmul2];
+            $x[$bmul2 + 1] ^= $subkeyItem[$bmul2 + 1];
         }
 
         for ($s = self::N_STEPS - 1; $s >= 0; $s--) {
-            [$x[0], $x[2]] = [$x[2], $x[0]];
-            [$x[1], $x[3]] = [$x[3], $x[1]];
+            $tmp = $x[0];
+            $x[0] = $x[2];
+            $x[2] = $tmp;
+            $tmp = $x[1];
+            $x[1] = $x[3];
+            $x[3] = $tmp;
 
             $tmp = ((($x[0] ^ $x[1]) << 8) | (($x[0] ^ $x[1]) >> 8)) & 0xFFFF;
             $x[2] ^= $x[0] ^ $tmp;
             $x[3] ^= $x[1] ^ $tmp;
 
             for ($b = 0; $b < self::N_BRANCHES; $b++) {
+                $subkeyItem = $k[self::N_BRANCHES * $s + $b];
+                $bmul2 = $b << 1;
+                $xb = $x[$bmul2];
+                $xb1 = $x[$bmul2 + 1];
                 for ($r = self::ROUNDS_PER_STEP - 1; $r >= 0; $r--) {
 
-                    $r2 = $x[2 * $b + 1] ^ $x[2 * $b];
+                    $r2 = $xb1 ^ $xb;
                     $r2 = (($r2 << 14) | ($r2 >> 2)) & 0xFFFF;
-                    $l2 = ($x[2 * $b] - $r2) & 0xFFFF;
+                    $l2 = ($xb - $r2) & 0xFFFF;
                     $l2 = (($l2 << 7) | ($l2 >> 9)) & 0xFFFF;
 
-                    $x[2 * $b] = $l2;
-                    $x[2 * $b + 1] = $r2;
+                    $xb = $l2;
+                    $xb1 = $r2;
 
-                    $x[2 * $b] ^= $k[self::N_BRANCHES * $s + $b][2 * $r];
-                    $x[2 * $b + 1] ^= $k[self::N_BRANCHES * $s + $b][2 * $r + 1];
+                    $xb ^= $subkeyItem[2 * $r];
+                    $xb1 ^= $subkeyItem[2 * $r + 1];
                 }
+                $x[$bmul2] = $xb;
+                $x[$bmul2 + 1] = $xb1;
             }
         }
 

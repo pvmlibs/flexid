@@ -28,6 +28,6 @@ trait HasBackwardCompatibilityTesting
         \hash_update($incrementHash, $feed($maxRange));
         $hash = \hash_final($incrementHash);
 
-        $this::assertSame($hash, file_get_contents(__DIR__ . "/BackwardCompatibility/{$name}.txt"));
+        $this::assertSame($hash, file_get_contents(__DIR__ . "/BackwardCompatibility/{$name}.txt"), \get_called_class() . ' is not backward compatible');
     }
 }

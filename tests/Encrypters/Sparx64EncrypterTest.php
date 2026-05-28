@@ -10,6 +10,7 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 use Pvmlibs\FlexId\Serializers\BCMathSerializer;
 use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
 use Pvmlibs\FlexId\Serializers\GMPSerializer;
+use Pvmlibs\FlexId\Serializers\HexSerializer;
 use Pvmlibs\FlexId\Serializers\NativeSerializer;
 use Tests\Internal\HasBackwardCompatibilityTesting;
 use Tests\Internal\HasIdCharDistributionTesting;
@@ -44,6 +45,12 @@ final class Sparx64EncrypterTest extends TestCase
     {
         $secret = Sparx64Encrypter::generateSecret();
         $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new FixedLengthSerializer()));
+    }
+
+    public function testEncryptDecryptWithHexSerializer(): void
+    {
+        $secret = Sparx64Encrypter::generateSecret();
+        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new HexSerializer()));
     }
 
     private function runBatch(Sparx64Encrypter $encrypter): void

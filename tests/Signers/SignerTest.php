@@ -9,6 +9,7 @@ use Pvmlibs\FlexId\Exceptions\IdSigningException;
 use Pvmlibs\FlexId\Exceptions\IdVerifySignException;
 use Pvmlibs\FlexId\Serializers\BCMathSerializer;
 use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
+use Pvmlibs\FlexId\Serializers\HexSerializer;
 use Pvmlibs\FlexId\Serializers\NativeSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
 use Tests\Internal\HasBackwardCompatibilityTesting;
@@ -67,6 +68,17 @@ final class SignerTest extends TestCase
         $this->validateSignAndVerify($signer, 2000, 1, 8);
     }
 
+    public function testWithHexSerializer(): void
+    {
+        $key = Signer::generateKey();
+        $signer = new Signer(
+            serializer: new HexSerializer(),
+            key: $key,
+            hashAlgo: 'siphash-2-4',
+        );
+        $this->validateSignAndVerify($signer);
+    }
+
     public function testWithVariableSignLength(): void
     {
         $key = Signer::generateKey();
@@ -87,7 +99,7 @@ final class SignerTest extends TestCase
     public function testWithNoSeparator(): void
     {
         $key = Signer::generateKey();
-        for ($i = 1; $i <= 17; $i++) {
+        for ($i = 1; $i <= 16; $i++) {
             $signer = new Signer(
                 serializer: new FixedLengthSerializer(),
                 key: $key,
@@ -288,7 +300,7 @@ final class SignerTest extends TestCase
             $sign = \substr($signedId, \strlen($id));
             $ids[$i] = $sign;
         }
-        $maxDeviations = $this->getMaxDeviation($ids, $signer->getSerializer()->getAlphabet());
+        $maxDeviations = $this->getMaxDeviation($ids, $signer->getAlphabet());
         // sign chars should be close to random, max deviation 2 times as random one from mean
         $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
     }

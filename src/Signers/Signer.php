@@ -59,8 +59,8 @@ class Signer implements SignerContract
             $this->signFn = fn (string $data) => hash($this->hashAlgo, $data . $salt . $decodedSecret, true);
         }
 
-        if ($maxSignLength < 1) {
-            throw new \InvalidArgumentException('Sign max length must be positive integer');
+        if ($maxSignLength < 1 || $maxSignLength > 16) {
+            throw new \InvalidArgumentException('Sign max length must be between 1 and 16');
         }
 
         if (\strlen($this->separator) > 1) {
@@ -103,9 +103,7 @@ class Signer implements SignerContract
             throw new IdSigningException('Sign hash failed');
         }
 
-        return \substr($this->serializer->serialize([
-            $sign[4], $sign[3], $sign[2], $sign[1],
-        ]), 0, $this->maxSignLength);
+        return \substr($this->serializer->serialize(\array_values($sign)), 0, $this->maxSignLength);
     }
 
     public function getIdFromSigned(string $idWithSign): string
@@ -128,7 +126,7 @@ class Signer implements SignerContract
             $signPartPos = $separatorPos + 1;
         } else {
             if ($this->serializer->isConstantLength() || $this->maxSignLength === 1) {
-                $separatorPos = $signPartPos = \strlen($idWithSign) - min(16, $this->maxSignLength);
+                $separatorPos = $signPartPos = \strlen($idWithSign) - $this->maxSignLength;
             } else {
                 // assume id has constant length
                 $separatorPos = $signPartPos = 16;
@@ -145,8 +143,8 @@ class Signer implements SignerContract
         return $id;
     }
 
-    public function getSerializer(): SerializerContract
+    public function getAlphabet(): string
     {
-        return $this->serializer;
+        return $this->serializer->getAlphabet();
     }
 }

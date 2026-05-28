@@ -1,5 +1,7 @@
 ## ID overview
 
+### ID examples for different timestamp bitshift in function of time
+
 Overview table presenting generated ID with encoded and encrypted versions, using following configuration:
 ```php
 $resolver = new StaticWorkerResolver(
@@ -59,26 +61,50 @@ echo $bench->presentation(distribution: true);
 |                    |             |             |        |               | encoded       |kYVD2p5 (7)         |ktX7ZpP (7)         |KBt2hDC6 (8)        |x9V8hqvz (8)        |rFRBVnSz (8)        
 |                    |             |             |        |               | encrypted     |GBgyvDpMLRBDg (13)  |cGyPGxKMPpPXk (13)  |bdgkkgckLyDVd (13)  |qWKBKLdbjcGRR (13)  |kGMcVpYyQBcRw (13)
 
-Legend:
-* - too many bits. Worker bits + sequence bits + group bits + timestamp bit shift must be <= 30
-    (num) - id length
 
- Id lengths:                |    |
-----------------------------|----
-generator current id length | 17 
- generator max id length    | 19 
- encoder current id length  | 10 
- encoder max id length      | 12 
- encrypter current id length | 13 
- encrypter max id length    | 13 
+### Example of integer ID after different transformation
 
-Generator/encoder/encrypter throughput (generating 100000 id):||
-----------------------------|----
-id generator        |  4125192 [ids/sec]
-id generator burst  | 25829875 [ids/sec]
-id encode           |  2244739 [ids/sec]
-id decode           |  2497902 [ids/sec]
-id encrypt          |   134047 [ids/sec]
-id decrypt          |   149302 [ids/sec]
-id sign             |   775233 [ids/sec]
-id verify sign      |   702165 [ids/sec]
+Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Example for ID 57439            |                               e05f|                   QQQQQQQQQQQQPQRd|                                pVg|
+Example for ID 44275863723996160|                     9d4ca9d9647400|                   QQxKDGMxKxwDkDQQ|                         QBY7bz9BTy|
+
+
+Encoding + signing ID (FastSigner, SipHash2-4) - fastest 64-bit sign:
+
+Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Example for ID 57439            |               e05fd565a68ef47ccc27|   QQQQQQQQQQQQPQRd4de4f2c039095285|                pVg999408ecd2349573|
+Example for ID 44275863723996160|     9d4ca9d96474004bb128fa8e3d0505|   QQxKDGMxKxwDkDQQ013496af26f54f6c|         QBY7bz9BTy5fe6a9cf8f2c0615|
+
+
+Encoding + signing ID (Signer, SipHash2-4, BCMathSerializer) - shortest 64-bit sign:
+
+Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Example for ID 57439            |                 e05f.YyjCvJzgjyXVB|     QQQQQQQQQQQQPQRd.JLKydRgZQRPRk|                  pVg.pymddJPFzWcvB|
+Example for ID 44275863723996160|       9d4ca9d9647400.GXWMYkGWRRWqx|     QQxKDGMxKxwDkDQQ.CZLgjbbMKdZMR|           QBY7bz9BTy.DWPxYkkdLpWbM|
+
+
+Encrypting ID:
+
+Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Example for ID 57439            |                   a373a8769ac449dc|                   MgkgMBkwxMGDDxKG|                      vcQBKVmZjwXvw|                       GKhbxTVHdcD7|
+Example for ID 44275863723996160|                   0c45becd8ba9c5f8|                   QGDRLPGKBLMxGRdB|                      dxkjCfMJgwqgC|                       h4b3RFmNS3jx|
+
+
+Encrypting + signing ID (FastSigner, SipHash2-4) - fastest 64-bit sign:
+
+Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Example for ID 57439            |   a373a8769ac449dc531734dc04dd5002|   MgkgMBkwxMGDDxKG9c9e09f12be3fbec|      vcQBKVmZjwXvwf527b129453a7fde|       GKhbxTVHdcD7d0e8ffa9050daa82|
+Example for ID 44275863723996160|   0c45becd8ba9c5f874dcdc8ae114a056|   QGDRLPGKBLMxGRdBb05ee70125fd9545|      dxkjCfMJgwqgC4ebcd1a67e38014d|       h4b3RFmNS3jxaf702d1d0534f808|
+
+
+Encrypting + signing ID (Signer, SipHash2-4, BCMathSerializer) - shortest 64-bit sign:
+
+Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
+--------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+Example for ID 57439            |     a373a8769ac449dc.dyfVqCfMBDDjM|     MgkgMBkwxMGDDxKG.yzGLWdQpLWmwP|        vcQBKVmZjwXvw.XdKKWDqdgCDVw|         GKhbxTVHdcD7.wqzpYfBjvLQwQ|
+Example for ID 44275863723996160|     0c45becd8ba9c5f8.qXGzFwCZLWZQk|     QGDRLPGKBLMxGRdB.fzzBdppVkgbJB|         dxkjCfMJgwqgC.YJfKcGkcCXzm|         h4b3RFmNS3jx.fCJZvjdWQKfzx|
