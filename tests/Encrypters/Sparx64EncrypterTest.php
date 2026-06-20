@@ -5,114 +5,89 @@ declare(strict_types=1);
 namespace Tests\Encrypters;
 
 use PHPUnit\Framework\TestCase;
+use Pvmlibs\FlexId\Contracts\SerializerContract;
 use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
-use Pvmlibs\FlexId\Exceptions\IdEncodeException;
-use Pvmlibs\FlexId\Serializers\BCMathSerializer;
-use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
-use Pvmlibs\FlexId\Serializers\GMPSerializer;
+use Pvmlibs\FlexId\Serializers\Base64Serializer;
+use Pvmlibs\FlexId\Serializers\BaseSerializer;
+use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Serializers\HexSerializer;
-use Pvmlibs\FlexId\Serializers\NativeSerializer;
+use Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersBCMath;
+use Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersGmp;
 use Tests\Internal\HasBackwardCompatibilityTesting;
-use Tests\Internal\HasIdCharDistributionTesting;
+use Tests\Internal\HasCharDistributionTesting;
 
 /**
  * @internal
  */
 final class Sparx64EncrypterTest extends TestCase
 {
-    use HasIdCharDistributionTesting;
+    use HasCharDistributionTesting;
     use HasBackwardCompatibilityTesting;
+    use HasEncrypterTesting;
 
-    public function testEncryptDecryptWithBCMathSerializer(): void
+    public function testEncryptDecryptWithCustomAlphabetBCMathOps(): void
     {
-        $secret = Sparx64Encrypter::generateSecret();
-        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new BCMathSerializer()));
+        $this->runBatchForSerializer(new CustomSerializer(new FullRangeIntegersBCMath()));
     }
 
-    public function testEncryptDecryptWithNativeSerializer(): void
+    public function testEncryptDecryptWithBaseSerializer(): void
     {
-        $secret = Sparx64Encrypter::generateSecret();
-        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new NativeSerializer()));
+        $this->runBatchForSerializer(new BaseSerializer());
     }
 
-    public function testEncryptDecryptWithGMPSerializer(): void
+    public function testEncryptDecryptWithCustomAlphabetGMPOps(): void
     {
-        $secret = Sparx64Encrypter::generateSecret();
-        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new GMPSerializer()));
-    }
-
-    public function testEncryptDecryptWithFixedLengthSerializer(): void
-    {
-        $secret = Sparx64Encrypter::generateSecret();
-        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new FixedLengthSerializer()));
+        $this->runBatchForSerializer(new CustomSerializer(new FullRangeIntegersGmp()));
     }
 
     public function testEncryptDecryptWithHexSerializer(): void
     {
-        $secret = Sparx64Encrypter::generateSecret();
-        $this->runBatch(new Sparx64Encrypter(secret: $secret, serializer: new HexSerializer()));
+        $this->runBatchForSerializer(new HexSerializer());
     }
 
-    private function runBatch(Sparx64Encrypter $encrypter): void
+    public function testEncryptDecryptWithBase64Serializer(): void
     {
-        $encryptedIds = [];
-        for ($i = 0; $i < 200; $i++) {
-            $encryptedIds[] = $encrypter->encrypt($i);
-            $this::assertSame($i, $encrypter->decrypt($encryptedIds[$i]));
-        }
-        $this::assertCount(\count($encryptedIds), \array_unique($encryptedIds));
+        $this->runBatchForSerializer(new Base64Serializer());
+    }
 
-        $incrementHashDecrypted = hash_init('sha256');
-        $incrementHashToEncrypt = hash_init('sha256');
+    private function runBatchForSerializer(SerializerContract $serializer): void
+    {
+        $secret = Sparx64Encrypter::generateSecret();
 
-        // test random id from whole range
-        $encryptedIds = [];
-        for ($i = 0; $i < 2000; $i++) {
-            $id = \random_int(1001, PHP_INT_MAX - 1);
-            $encryptedIds[] = ($idEncrypted = $encrypter->encrypt($id));
-            hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($idEncrypted));
-            hash_update($incrementHashToEncrypt, (string) $id);
-        }
+        $encrypter = new Sparx64Encrypter(secret: $secret, serializer: $serializer);
 
-        $this::assertSame(\hash_final($incrementHashDecrypted), \hash_final($incrementHashToEncrypt));
+        $encrypted = [];
+        $this->runBatch($encrypter, $encrypted);
+        $this::assertCount(\count($encrypted), \array_unique($encrypted));
 
-        $this::assertCount(\count($encryptedIds), \array_unique($encryptedIds));
-
-        $encoded = $encrypter->encrypt(PHP_INT_MAX);
-        $this::assertSame(PHP_INT_MAX, $encrypter->decrypt($encoded));
+        $encryptedNoAD = $encrypter->encrypt(100);
+        $encryptedWithAD = $encrypter->encrypt(100, 'abc');
+        $this::assertSame($encryptedNoAD, $encryptedWithAD); // This encrypter does not support associated data
     }
 
     public function testWrongSecret(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new Sparx64Encrypter(secret: 'asfdsd', serializer: new BCMathSerializer());
+        new Sparx64Encrypter(secret: 'asfdsd', serializer: new BaseSerializer());
     }
 
-    public function testEncryptBelowRange(): void
+    public function testEvenCharsDistributionHexSerializer(): void
     {
-        $secret = Sparx64Encrypter::generateSecret();
-        $encrypter = new Sparx64Encrypter(secret: $secret, serializer: new BCMathSerializer());
-        $this->expectException(IdEncodeException::class);
-        $encrypter->encrypt(-1);
-    }
-
-    public function testEvenCharsDistribution(): void
-    {
-        $encrypter = new Sparx64Encrypter(secret: 'rCl29//aZ51LjLQZKUbMUA==', serializer: new FixedLengthSerializer());
+        $encrypter = new Sparx64Encrypter(secret: 'rCl29//aZ51LjLQZKUbMUA==', serializer: new HexSerializer());
 
         $total = 1000;
         $ids = new \SplFixedArray($total);
         for ($i = 0; $i < $total; $i++) {
-            $ids[$i] = $encrypter->encrypt(\random_int(0, PHP_INT_MAX));
+            $ids[$i] = $encrypter->encrypt(\random_int(0, PHP_INT_MAX), '');
         }
-        $maxDeviations = $this->getMaxDeviation($ids, $encrypter->getSerializer()->getAlphabet());
+        $maxDeviations = $this->getMaxDeviation($ids, (new HexSerializer())->getAlphabet());
         // should be close to random, max deviation 2 times as random one from mean
         $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
     }
 
     public function testBackwardCompatibility(): void
     {
-        $encrypter = new Sparx64Encrypter(secret: 'rCl29//aZ51LjLQZKUbMUA==', serializer: new BCMathSerializer());
-        $this->validateBackwardCompatibility(fn (int $id): string => $encrypter->encrypt($id), PHP_INT_MAX, 'Sparx64Encrypter');
+        $encrypter = new Sparx64Encrypter(secret: 'rCl29//aZ51LjLQZKUbMUA==', serializer: new BaseSerializer());
+        $this->validateBackwardCompatibility(fn (int $id): string => $encrypter->encrypt($id), PHP_INT_MIN, PHP_INT_MAX, 'Sparx64Encrypter');
     }
 }

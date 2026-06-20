@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Tools;
 
-use Pvmlibs\FlexId\Encoders\EncoderContract;
-use Pvmlibs\FlexId\Encrypters\EncrypterContract;
+use Pvmlibs\FlexId\Contracts\EncrypterContract;
+use Pvmlibs\FlexId\Contracts\SerializerContract;
+use Pvmlibs\FlexId\Contracts\SignerContract;
 use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\IdGeneratorException;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\ApcuTimestepWorkerResolver;
 use Pvmlibs\FlexId\Resolvers\StaticWorkerResolver;
-use Pvmlibs\FlexId\Signers\SignerContract;
 
 /**
  * Shows id time range, throughput and lengths for different timestamp bit shifts and years.
@@ -24,7 +24,7 @@ class IdStats
      */
     public function __construct(
         private FlexIdGenerator $generator,
-        private ?EncoderContract $encoder = null,
+        private ?SerializerContract $serializer = null,
         private ?EncrypterContract $encrypter = null,
         private ?SignerContract $signer = null,
         private array $timestampBitShifts = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
@@ -114,8 +114,8 @@ class IdStats
                 $yearMicroseconds = $yearDelta * 12 * 30 * 24 * 60 * 60 * 1_000_000;
                 try {
                     $id = $generator->idInTime((int) (\microtime(true) * 1_000_000) + $yearMicroseconds);
-                    $encoded = $this->encoder?->encode($id);
-                    $encrypted = $this->encrypter?->encrypt($id);
+                    $encoded = $this->serializer?->serialize($id);
+                    $encrypted = $this->encrypter?->encrypt($id, '');
                 } catch (IdGeneratorException) {
                     $id = 'time range exhausted';
                     $encoded = null;
@@ -147,15 +147,13 @@ class IdStats
         $results['generator current id length'] = \strlen((string) $testId);
         $results['generator max id length'] = \strlen((string) PHP_INT_MAX);
 
-        if ($this->encoder !== null) {
-            $results['encoder current id length'] = \strlen($this->encoder->encode($testId));
-            $results['encoder max id length'] = $this->encoder->getMaxEncodedLength();
+        if ($this->serializer !== null) {
+            $results['encoder current id length'] = \strlen($this->serializer->serialize($testId));
+            $results['encoder max id length'] = $this->serializer->getMaxEncodedLength();
         }
 
         if ($this->encrypter !== null) {
-            $results['encrypter current id length'] = \strlen($this->encrypter->encrypt($testId));
-            $results['encrypter max id length'] = $this->encrypter->getSerializer()->getMaxEncodedLength();
-
+            $results['encrypter current id length'] = \strlen($this->encrypter->encrypt($testId, ''));
         }
 
         return $results;
@@ -197,29 +195,29 @@ class IdStats
         // for encoder/decoder 1000 is enough
         $total = 1000;
 
-        if ($this->encoder !== null) {
-            $encoded = $this->encoder->encode($testId);
+        if ($this->serializer !== null) {
+            $encoded = $this->serializer->serialize($testId);
             $start = \hrtime(true);
             for ($i = 0; $i < $total; $i++) {
-                $this->encoder->encode($testId);
+                $this->serializer->serialize($testId);
             }
             $end = \hrtime(true);
             $results['perf']['id encode'] = \round($total / ($end - $start) * 1e9);
 
             $start = \hrtime(true);
             for ($i = 0; $i < $total; $i++) {
-                $this->encoder->decode($encoded);
+                $this->serializer->deserialize($encoded);
             }
             $end = \hrtime(true);
             $results['perf']['id decode'] = \round($total / ($end - $start) * 1e9);
         }
 
         if ($this->encrypter !== null) {
-            $encrypted = $this->encrypter->encrypt($testId);
+            $encrypted = $this->encrypter->encrypt($testId, '');
 
             $start = \hrtime(true);
             for ($i = 0; $i < $total; $i++) {
-                $this->encrypter->encrypt($testId);
+                $this->encrypter->encrypt($testId, '');
             }
             $end = \hrtime(true);
             $results['perf']['id encrypt'] = \round($total / ($end - $start) * 1e9);
@@ -278,24 +276,17 @@ class IdStats
             $config->timestampBitshift,
         );
 
-        if ($this->encoder !== null) {
-            $class = explode('\\', $this->encoder::class);
+        if ($this->serializer !== null) {
+            $class = explode('\\', $this->serializer::class);
             $text .= sprintf(
                 "Encoder: %s(alphabet %s)\n",
                 end($class),
-                $this->encoder->getAlphabet(),
+                $this->serializer->getAlphabet(),
             );
         }
 
         if ($this->encrypter !== null) {
             $encrypterClass = explode('\\', $this->encrypter::class);
-            $serializerClass = explode('\\', $this->encrypter->getSerializer()::class);
-            $text .= sprintf(
-                "Encoder: %s(serializer: %s, alphabet %s)\n",
-                end($encrypterClass),
-                end($serializerClass),
-                $this->encrypter->getSerializer()->getAlphabet(),
-            );
         }
 
         if ($info) {

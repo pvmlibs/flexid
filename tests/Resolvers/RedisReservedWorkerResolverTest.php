@@ -68,7 +68,7 @@ final class RedisReservedWorkerResolverTest extends TestCase
 
     private function dbUsage(\Redis|Client $redisClient): void
     {
-        $timeoutMs = 5;
+        $timeoutMs = 15;
         $resolver = new RedisReservedWorkerResolver(client: $redisClient, workersBits: 0, TTLMs: $timeoutMs, minimalWorkerSeparationMs: 1);
         $workerSeparationMs = $resolver->getWorkerSeparationMs();
         $resolver->clearDatabase();
@@ -84,7 +84,7 @@ final class RedisReservedWorkerResolverTest extends TestCase
         $this::assertNull($usage['lastLockDate']);
 
         // with positive time offset it will be 0
-        $usage = $resolver->getCurrentlyUsedWorkers($workerSeparationMs + 5);
+        $usage = $resolver->getCurrentlyUsedWorkers($workerSeparationMs + $timeoutMs);
         $this::assertSame(0, $usage['usedWorkers']);
 
         $resolver->releaseWorker();

@@ -6,7 +6,8 @@ namespace Tests\Tools;
 
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\FlexIdGenerator;
-use Pvmlibs\FlexId\Serializers\NativeSerializer;
+use Pvmlibs\FlexId\Serializers\BaseSerializer;
+use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
 use Pvmlibs\FlexId\Tools\IdStats;
 
@@ -26,12 +27,12 @@ final class IdStatsTest extends TestCase
                     timestampBitshift: 0,
                 ),
             ),
-            encoder: new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder(),
+            serializer: new CustomSerializer(),
             encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
                 secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
-                serializer: new NativeSerializer(),
+                serializer: new BaseSerializer(),
             ),
-            signer: new Signer(new NativeSerializer(), 'PsQBSNyMoz60RpQnSKWBMg=='),
+            signer: new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer()),
             yearsDelta: [0, 10, 50, 100, 350],
         );
         $this::assertNotEmpty($idDistribution->presentation());
@@ -48,12 +49,12 @@ final class IdStatsTest extends TestCase
                     timestampBitshift: 0,
                 ),
             ),
-            encoder: new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder(),
+            serializer: new CustomSerializer(),
             encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
                 secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
-                serializer: new NativeSerializer(),
+                serializer: new BaseSerializer(),
             ),
-            signer: new Signer(new NativeSerializer(), 'PsQBSNyMoz60RpQnSKWBMg=='),
+            signer: new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer()),
             yearsDelta: [0, 10, 50, 100, 350],
         );
         $this::assertNotEmpty($idDistribution->presentation());
@@ -70,12 +71,12 @@ final class IdStatsTest extends TestCase
                     timestampBitshift: 0,
                 ),
             ),
-            encoder: new \Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder(),
+            serializer: new CustomSerializer(),
             encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
                 secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
-                serializer: new NativeSerializer(),
+                serializer: new BaseSerializer(),
             ),
-            signer: new Signer(new NativeSerializer(), 'PsQBSNyMoz60RpQnSKWBMg=='),
+            signer: new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer()),
         );
         $this::assertNotEmpty($idDistribution->presentation());
     }

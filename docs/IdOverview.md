@@ -14,10 +14,10 @@ $generator = new FlexIdGenerator(workerResolver: $resolver);
 
 $bench = new IdStats(
     generator: new FlexIdGenerator(workerResolver: $resolver),
-    encoder: new RotatedAlphabetEncoder(),
+    serializer: new CustomSerializer(),
     encrypter: new Sparx64Encrypter(
         secret: Sparx64Encrypter::generateSecret(),
-        serializer: new NativeSerializer()
+        serializer: new BaseSerializer()
     ),
 );
 
@@ -64,47 +64,72 @@ echo $bench->presentation(distribution: true);
 
 ### Example of integer ID after different transformation
 
-Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
+Serializer                      | CustomSerializer, alphabet 50 characters | BaseSerializer, alphabet 32 characters | HashSerializer, alphabet 50 characters
+--------------------------------|------------------------------------------|------------------------------------------|------------------------------------------|
+Example for ID 57439            | prC                                      | fxZD                         | GZk
+Example for ID 44275863723996160| QzrSq1bzBC                               | FFWQyCKJCGKD                 | 9bWvY5BdYq
+
+
+Encoding + signing ID (Signer, sha256, BaseSerializer):
+
+Serializer                         | CustomSerializer, alphabet 50 characters | BaseSerializer, alphabet 32 characters |
+--------------------------------|-----------------------------------------|------------------------------------------|
+Example for ID 57439            | pVgjYkvxVXpQWWFG                        | fxZDVLmdKgBpvbFMP                        |
+Example for ID 44275863723996160| QBY7bz9BTymyCLDdxBJCyVC                 | FFWQyCKJCGKDqWMmYWzwKLFbk                |
+
+
+Encrypting ID (Sparx64Encrypter + Signer 64bit):
+
+Serializer                      |                      HexSerializer|     BaseSerializer| CustomSerializer           |
+--------------------------------|-----------------------------------|--------------------------------|-----------------------------------|
+Example for ID 57439            |     a373a8769ac449dc.dyfVqCfMBDDjM|     vcQBKVmZjwXvw.XdKKWDqdgCDVw| GKhbxTVHdcD7.wqzpYfBjvLQwQ |
+Example for ID 44275863723996160|     0c45becd8ba9c5f8.qXGzFwCZLWZQk|     dxkjCfMJgwqgC.YJfKcGkcCXzm| h4b3RFmNS3jx.fCJZvjdWQKfzx |
+
+Encrypting ID (AesEncrypter + Signer 64bit):
+
+Serializer                      |                      HexSerializer|   BaseSerializer|                   CustomSerializer|
 --------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
-Example for ID 57439            |                               e05f|                   QQQQQQQQQQQQPQRd|                                pVg|
-Example for ID 44275863723996160|                     9d4ca9d9647400|                   QQxKDGMxKxwDkDQQ|                         QBY7bz9BTy|
+Example for ID 57439            |   6195aa4314f6e611cc9a13083a6fbd3e|   JCZMwJjqVQwCPjwvYpRzBjYLjg|           XVzP65DQrVf3QD66zbvTSXpx|
+Example for ID 44275863723996160|   587d3a108ac92a64988cfcf0b6232e3f|   WkyFDWwbGwbVxCwMDLqLwyWLzx|            39WWQSFNdkX.dvnpTG4bk2s|
+
+No serializer, build-in encoder
+
+Serializer                      |                        hex encoder|
+--------------------------------|-----------------------------------|
+Example for ID 57439            |   6195aa4314f6e611cc9a13083a6fbd3e|
+Example for ID 44275863723996160|   587d3a108ac92a64988cfcf0b6232e3f|
 
 
-Encoding + signing ID (FastSigner, SipHash2-4) - fastest 64-bit sign:
+Encrypting ID (XChaCha20Encrypter - embedded signing with Poly1305, no custom serializer):
 
-Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
---------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
-Example for ID 57439            |               e05fd565a68ef47ccc27|   QQQQQQQQQQQQPQRd4de4f2c039095285|                pVg999408ecd2349573|
-Example for ID 44275863723996160|     9d4ca9d96474004bb128fa8e3d0505|   QQxKDGMxKxwDkDQQ013496af26f54f6c|         QBY7bz9BTy5fe6a9cf8f2c0615|
-
-
-Encoding + signing ID (Signer, SipHash2-4, BCMathSerializer) - shortest 64-bit sign:
-
-Encoder                         |                         HexEncoder|                 FixedLengthEncoder|             RotatedAlphabetEncoder|
---------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
-Example for ID 57439            |                 e05f.YyjCvJzgjyXVB|     QQQQQQQQQQQQPQRd.JLKydRgZQRPRk|                  pVg.pymddJPFzWcvB|
-Example for ID 44275863723996160|       9d4ca9d9647400.GXWMYkGWRRWqx|     QQxKDGMxKxwDkDQQ.CZLgjbbMKdZMR|           QBY7bz9BTy.DWPxYkkdLpWbM|
+Serializer                      |                        hex encoder|                     base64 encoder|
+--------------------------------|-----------------------------------|-----------------------------------|
+Example for ID 57439            |495bff83f2e2d129694bd39694c434766c3a4a78a0133c1eda157b3a0df3297e943505dd10fb08416535ce4100def2b3|ITI1e4LQWQiY4QvjnJnPOw0GbM3DpAcmfV8ORVm1vamoRYeW0hwsF651Pjyi5xt2|
+Example for ID 44275863723996160|eb5b09e03872fda5871c032647f2a8cca48f41d818da7b027d21a4288f027cd0e16fa14a9405086b55514e0f9e9970a9|lDfqeDdqCMJCMrLvtYjM4c13XS2jrjKWA1ML4z5cT-Vgq-ezXdQq2dW8CrxnNfDZ|
 
 
-Encrypting ID:
+### Example of encoding sequential ID
 
-Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
---------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
-Example for ID 57439            |                   a373a8769ac449dc|                   MgkgMBkwxMGDDxKG|                      vcQBKVmZjwXvw|                       GKhbxTVHdcD7|
-Example for ID 44275863723996160|                   0c45becd8ba9c5f8|                   QGDRLPGKBLMxGRdB|                      dxkjCfMJgwqgC|                       h4b3RFmNS3jx|
+ID  |   CustomSerializer    |   HashSerializer  | 
+-|--|--
+100000 | dddY   |   qsQ3
+100002 | 7ddY   |   P7Hy
+100003 | xddY   |   FpF6
+100004 | 3ddY   |   gRYw
+100005 | DddY   |   VC7T
+100006 | bddY   |   Zg8M
+100007 | 2ddY   |   Xr9R
+100008 | LddY   |   Kspc
+100009 | YddY   |   3HYY
+1000010| 5ddY   |   ydDN
 
 
-Encrypting + signing ID (FastSigner, SipHash2-4) - fastest 64-bit sign:
-
-Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
---------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
-Example for ID 57439            |   a373a8769ac449dc531734dc04dd5002|   MgkgMBkwxMGDDxKG9c9e09f12be3fbec|      vcQBKVmZjwXvwf527b129453a7fde|       GKhbxTVHdcD7d0e8ffa9050daa82|
-Example for ID 44275863723996160|   0c45becd8ba9c5f874dcdc8ae114a056|   QGDRLPGKBLMxGRdBb05ee70125fd9545|      dxkjCfMJgwqgC4ebcd1a67e38014d|       h4b3RFmNS3jxaf702d1d0534f808|
 
 
-Encrypting + signing ID (Signer, SipHash2-4, BCMathSerializer) - shortest 64-bit sign:
 
-Serializer                      |                      HexSerializer|              FixedLengthSerializer|                   NativeSerializer|                   BCMathSerializer|
---------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
-Example for ID 57439            |     a373a8769ac449dc.dyfVqCfMBDDjM|     MgkgMBkwxMGDDxKG.yzGLWdQpLWmwP|        vcQBKVmZjwXvw.XdKKWDqdgCDVw|         GKhbxTVHdcD7.wqzpYfBjvLQwQ|
-Example for ID 44275863723996160|     0c45becd8ba9c5f8.qXGzFwCZLWZQk|     QGDRLPGKBLMxGRdB.fzzBdppVkgbJB|         dxkjCfMJgwqgC.YJfKcGkcCXzm|         h4b3RFmNS3jx.fCJZvjdWQKfzx|
+
+
+
+
+
+

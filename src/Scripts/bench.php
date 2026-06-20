@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Pvmlibs\FlexId\Encoders\RotatedAlphabetEncoder;
 use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
 use Pvmlibs\FlexId\FlexIdGenerator;
 use Pvmlibs\FlexId\Resolvers\StaticWorkerResolver;
-use Pvmlibs\FlexId\Serializers\NativeSerializer;
+use Pvmlibs\FlexId\Serializers\BaseSerializer;
+use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Tools\IdStats;
 
 require_once 'vendor/autoload.php';
@@ -21,15 +21,15 @@ $generator = new FlexIdGenerator(workerResolver: $resolver);
 
 $bench = new IdStats(
     generator: new FlexIdGenerator(workerResolver: $resolver),
-    encoder: new RotatedAlphabetEncoder(),
+    serializer: new CustomSerializer(),
     encrypter: new Sparx64Encrypter(
         secret: Sparx64Encrypter::generateSecret(),
-        serializer: new NativeSerializer(),
+        serializer: new BaseSerializer(),
     ),
     signer: new Pvmlibs\FlexId\Signers\Signer(
-        serializer: new NativeSerializer(),
-        key: Pvmlibs\FlexId\Signers\Signer::generateKey(),
-        hashAlgo: 'tiger128,3',
+        secret: Pvmlibs\FlexId\Signers\Signer::generateSecret(),
+        serializer: new BaseSerializer(),
+        hashAlgo: 'sha256',
     ),
 );
 

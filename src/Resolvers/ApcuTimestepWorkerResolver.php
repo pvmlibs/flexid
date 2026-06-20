@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Resolvers;
 
+use Pvmlibs\FlexId\Contracts\WorkerResolverContract;
 use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\VO\IdConfiguration;
-
-use function max;
 
 /**
  * This resolver uses APCu as central source of truth, to produce globally unique worker IDs all processes must share

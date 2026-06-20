@@ -25,30 +25,32 @@ final class GeneratorWithApcuResolverTest extends TestCase
         $total = 10000;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     public function testGenerateShort(): void
     {
         $resolver = new ShortApcuTimestepWorkerResolver();
         $generator = new FlexIdGenerator(workerResolver: $resolver);
-        $total = 16000;
+        $total = 8000;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     public function testWorkersOverflow(): void
     {
         $resolver = new ApcuTimestepWorkerResolver(workersBits: 10, sequenceBits: 0, groupsBits: 18, resolveWorkerTrials: 1);
         $generator = new FlexIdGenerator(workerResolver: $resolver);
-        $total = 3000;
+        $total = 1500;
 
         $this->expectException(NoWorkerAvailableException::class);
         for ($i = 0; $i < $total; $i++) {

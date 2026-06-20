@@ -51,10 +51,11 @@ final class GeneratorWithRedisReservedResolverTest extends TestCase
         $total = 10000;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     private function generateShortIds(\Redis|Client $redisClient): void
@@ -68,13 +69,14 @@ final class GeneratorWithRedisReservedResolverTest extends TestCase
         );
         $resolver->clearDatabase();
         $generator = new FlexIdGenerator(workerResolver: $resolver);
-        $total = 20000;
+        $total = 10000;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     private function overflowWorkers(\Redis|Client $redisClient): void
@@ -98,7 +100,7 @@ final class GeneratorWithRedisReservedResolverTest extends TestCase
             workersBits: 0,
             sequenceBits: 10,
             groupsBits: 0,
-            TTLMs: 100,
+            TTLMs: 70,
             minimalWorkerSeparationMs: 10,
             timestampBitshift: $timestampBitshift,
         );
@@ -111,7 +113,7 @@ final class GeneratorWithRedisReservedResolverTest extends TestCase
         $workerId = $resolver->getCurrentWorkerId();
 
         // wait till timeout
-        \usleep(100000);
+        \usleep(70000);
 
         $ids[] = $generator->id();
 

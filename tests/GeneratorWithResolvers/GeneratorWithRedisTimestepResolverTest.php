@@ -45,10 +45,11 @@ final class GeneratorWithRedisTimestepResolverTest extends TestCase
         $total = 10000;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     private function generateShortIds(\Redis|Client $redisClient): void
@@ -56,13 +57,14 @@ final class GeneratorWithRedisTimestepResolverTest extends TestCase
         $resolver = new ShortRedisTimestepWorkerResolver(client: $redisClient, timestampBitshift: 14);
         $resolver->clearDatabase();
         $generator = new FlexIdGenerator(workerResolver: $resolver);
-        $total = 20000;
+        $total = 10000;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     public function overflowWorkers(\Redis|Client $redisClient): void

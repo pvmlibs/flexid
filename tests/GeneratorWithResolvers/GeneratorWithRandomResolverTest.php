@@ -21,10 +21,11 @@ final class GeneratorWithRandomResolverTest extends TestCase
         $total = max(10000, $resolver->getConfiguration()->maxWorkers * 10);
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     public function testWorkersOverflow(): void
@@ -34,9 +35,10 @@ final class GeneratorWithRandomResolverTest extends TestCase
         $total = $resolver->getConfiguration()->maxWorkers * 2;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 }

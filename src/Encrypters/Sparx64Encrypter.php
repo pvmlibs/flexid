@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Encrypters;
 
-use Pvmlibs\FlexId\Exceptions\IdDecodeException;
-use Pvmlibs\FlexId\Exceptions\IdEncodeException;
-use Pvmlibs\FlexId\Serializers\SerializerContract;
+use Pvmlibs\FlexId\Contracts\EncrypterContract;
+use Pvmlibs\FlexId\Contracts\SerializerContract;
 
 /**
- * Encrypts/decrypts id using Sparx64 algorithm. This can be used when raw id are considered
- * especially sensitive.
- * It doesn't require any extensions if used with NativeSerializer.
- * About 12-15x slower than using only encoders for raw id, but still can be fast enough.
+ * Encrypts/decrypts id using Sparx64 algorithm. It operates on 64-bit block with 128-bit key, produces 64-bit output.
+ * Depending on used serializer, max output length will be 11-16 chars (with default alphabets).
+ * It doesn't require any php extensions.
+ * Notes:
+ * - for the same data (input id, additionalData, secret) it will produce the same output
+ * - when decrypting tampered output, it will produce some random id
+ * - it does not support additional data for authentication so encrypted id should be also signed.
+ *
+ * See more https://www.cryptolux.org/index.php/SPARX
  */
 class Sparx64Encrypter implements EncrypterContract
 {
@@ -24,9 +28,11 @@ class Sparx64Encrypter implements EncrypterContract
 
     /** @var array<non-negative-int, list<int>> Subkeys for encryption/decryption. */
     private array $subkeys = [];
+    /** @var array<int> */
+    private array $subkeyItem = [];
 
     /**
-     * @param string $secret Secret used by cipher. This needs to be treated with high confidentiality, do not
+     * @param string $secret Secret key used by cipher. This needs to be treated with high confidentiality, do not
      *                       include it in source code. Can use generateSecret() method to produce the secret.
      *
      * @throws \InvalidArgumentException
@@ -47,6 +53,7 @@ class Sparx64Encrypter implements EncrypterContract
             $masterKey[$i] = (\ord($decodedSecret[2 * $i]) << 8) | \ord($decodedSecret[2 * $i + 1]);
         }
         $this->subkeys = $this->keySchedule($masterKey);
+        $this->subkeyItem = $this->subkeys[self::N_BRANCHES * self::N_STEPS];
     }
 
     public static function generateSecret(): string
@@ -54,122 +61,159 @@ class Sparx64Encrypter implements EncrypterContract
         return \base64_encode(\random_bytes(self::SECRET_SIZE));
     }
 
-    public function encrypt(int $id): string
+    public function encrypt(int $id, string $additionalData = ''): string
     {
-        if ($id < 0) {
-            throw new IdEncodeException('Encrypted ID must be positive.');
-        }
+        static $mask = 0xFFFF;
 
-        $mask = 0xFFFF;
-        $x = [
-            $id & $mask,
-            ($id >> 16) & $mask,
-            ($id >> 32) & $mask,
-            ($id >> 48) & $mask,
-        ];
+        $x0 = $id & $mask;
+        $x1 = ($id >> 16) & $mask;
+        $x2 = ($id >> 32) & $mask;
+        $x3 = ($id >> 48) & $mask;
 
         $k = $this->subkeys;
         for ($s = 0; $s < self::N_STEPS; $s++) {
-            for ($b = 0; $b < self::N_BRANCHES; $b++) {
-                $subkeyItem = $k[self::N_BRANCHES * $s + $b];
-                $bmul2 = $b << 1;
-                $xb = $x[$bmul2];
-                $xb1 = $x[$bmul2 + 1];
+            // for ($b = 0; $b < self::N_BRANCHES; $b++) {
+            // branch 1
+            $subkeyItem = $k[self::N_BRANCHES * $s];
+            $xb = $x0;
+            $xb1 = $x1;
 
-                for ($r = 0; $r < self::ROUNDS_PER_STEP; $r++) {
-                    $rmul2 = $r << 1;
-                    $xb ^= $subkeyItem[$rmul2];
-                    $xb1 ^= $subkeyItem[$rmul2 + 1];
+            for ($r = 0; $r < self::ROUNDS_PER_STEP; $r++) {
+                $rmul2 = $r << 1;
+                $xb ^= $subkeyItem[$rmul2];
+                $xb1 ^= $subkeyItem[$rmul2 + 1];
 
-                    $l2 = (($xb << 9) | ($xb >> 7)) & 0xFFFF;
-                    $l2 = ($l2 + $xb1) & 0xFFFF;
-                    $r2 = (($xb1 << 2) | ($xb1 >> 14)) & 0xFFFF;
-                    $r2 ^= $l2;
+                $l2 = (($xb << 9) | ($xb >> 7)) & 0xFFFF;
+                $l2 = ($l2 + $xb1) & 0xFFFF;
+                $r2 = (($xb1 << 2) | ($xb1 >> 14)) & 0xFFFF;
+                $r2 ^= $l2;
 
-                    $xb = $l2;
-                    $xb1 = $r2;
-                }
-                $x[$bmul2] = $xb;
-                $x[$bmul2 + 1] = $xb1;
+                $xb = $l2;
+                $xb1 = $r2;
             }
+            $x0 = $xb;
+            $x1 = $xb1;
+            // }
 
-            $tmp = ((($x[0] ^ $x[1]) << 8) | (($x[0] ^ $x[1]) >> 8)) & 0xFFFF;
-            $x[2] ^= $x[0] ^ $tmp;
-            $x[3] ^= $x[1] ^ $tmp;
+            // branch 2
+            $subkeyItem = $k[self::N_BRANCHES * $s + 1];
+            $xb = $x2;
+            $xb1 = $x3;
 
-            $tmp = $x[0];
-            $x[0] = $x[2];
-            $x[2] = $tmp;
-            $tmp = $x[1];
-            $x[1] = $x[3];
-            $x[3] = $tmp;
+            for ($r = 0; $r < self::ROUNDS_PER_STEP; $r++) {
+                $rmul2 = $r << 1;
+                $xb ^= $subkeyItem[$rmul2];
+                $xb1 ^= $subkeyItem[$rmul2 + 1];
+
+                $l2 = (($xb << 9) | ($xb >> 7)) & 0xFFFF;
+                $l2 = ($l2 + $xb1) & 0xFFFF;
+                $r2 = (($xb1 << 2) | ($xb1 >> 14)) & 0xFFFF;
+                $r2 ^= $l2;
+
+                $xb = $l2;
+                $xb1 = $r2;
+            }
+            $x2 = $xb;
+            $x3 = $xb1;
+            // end branch 2
+
+            $tmp = ((($x0 ^ $x1) << 8) | (($x0 ^ $x1) >> 8)) & 0xFFFF;
+            $x2 ^= $x0 ^ $tmp;
+            $x3 ^= $x1 ^ $tmp;
+
+            $tmp = $x0;
+            $x0 = $x2;
+            $x2 = $tmp;
+            $tmp = $x1;
+            $x1 = $x3;
+            $x3 = $tmp;
         }
 
-        for ($b = 0; $b < self::N_BRANCHES; $b++) {
-            $bmul2 = $b << 1;
-            $subkeyItem = $k[self::N_BRANCHES * self::N_STEPS];
-            $x[$bmul2] ^= $subkeyItem[$bmul2];
-            $x[$bmul2 + 1] ^= $subkeyItem[$bmul2 + 1];
-        }
+        $x0 ^= $this->subkeyItem[0];
+        $x1 ^= $this->subkeyItem[1];
+        $x2 ^= $this->subkeyItem[2];
+        $x3 ^= $this->subkeyItem[3];
 
-        return $this->serializer->serialize($x);
+        return $this->serializer->serialize($x0 | ($x1 << 16) | ($x2 << 32) | ($x3 << 48));
     }
 
-    public function decrypt(string $id): int
+    public function decrypt(string $id, string $additionalData = ''): int
     {
-        $x = $this->serializer->deserialize($id);
+        $x64 = $this->serializer->deserialize($id);
+
+        static $mask = 0xFFFF;
+
+        $x0 = $x64 & $mask;
+        $x1 = ($x64 >> 16) & $mask;
+        $x2 = ($x64 >> 32) & $mask;
+        $x3 = ($x64 >> 48) & $mask;
+
         $k = $this->subkeys;
 
-        for ($b = 0; $b < self::N_BRANCHES; $b++) {
-            $bmul2 = $b << 1;
-            $subkeyItem = $k[self::N_BRANCHES * self::N_STEPS];
-            $x[$bmul2] ^= $subkeyItem[$bmul2];
-            $x[$bmul2 + 1] ^= $subkeyItem[$bmul2 + 1];
-        }
+        $x0 ^= $this->subkeyItem[0];
+        $x1 ^= $this->subkeyItem[1];
+        $x2 ^= $this->subkeyItem[2];
+        $x3 ^= $this->subkeyItem[3];
 
         for ($s = self::N_STEPS - 1; $s >= 0; $s--) {
-            $tmp = $x[0];
-            $x[0] = $x[2];
-            $x[2] = $tmp;
-            $tmp = $x[1];
-            $x[1] = $x[3];
-            $x[3] = $tmp;
+            $tmp = $x0;
+            $x0 = $x2;
+            $x2 = $tmp;
+            $tmp = $x1;
+            $x1 = $x3;
+            $x3 = $tmp;
 
-            $tmp = ((($x[0] ^ $x[1]) << 8) | (($x[0] ^ $x[1]) >> 8)) & 0xFFFF;
-            $x[2] ^= $x[0] ^ $tmp;
-            $x[3] ^= $x[1] ^ $tmp;
+            $tmp = ((($x0 ^ $x1) << 8) | (($x0 ^ $x1) >> 8)) & 0xFFFF;
+            $x2 ^= $x0 ^ $tmp;
+            $x3 ^= $x1 ^ $tmp;
 
-            for ($b = 0; $b < self::N_BRANCHES; $b++) {
-                $subkeyItem = $k[self::N_BRANCHES * $s + $b];
-                $bmul2 = $b << 1;
-                $xb = $x[$bmul2];
-                $xb1 = $x[$bmul2 + 1];
-                for ($r = self::ROUNDS_PER_STEP - 1; $r >= 0; $r--) {
+            // branch 1
+            $subkeyItem = $k[self::N_BRANCHES * $s];
+            $xb = $x0;
+            $xb1 = $x1;
+            for ($r = self::ROUNDS_PER_STEP - 1; $r >= 0; $r--) {
+                $rmul2 = $r << 1;
 
-                    $r2 = $xb1 ^ $xb;
-                    $r2 = (($r2 << 14) | ($r2 >> 2)) & 0xFFFF;
-                    $l2 = ($xb - $r2) & 0xFFFF;
-                    $l2 = (($l2 << 7) | ($l2 >> 9)) & 0xFFFF;
+                $r2 = $xb1 ^ $xb;
+                $r2 = (($r2 << 14) | ($r2 >> 2)) & 0xFFFF;
+                $l2 = ($xb - $r2) & 0xFFFF;
+                $l2 = (($l2 << 7) | ($l2 >> 9)) & 0xFFFF;
 
-                    $xb = $l2;
-                    $xb1 = $r2;
+                $xb = $l2;
+                $xb1 = $r2;
 
-                    $xb ^= $subkeyItem[2 * $r];
-                    $xb1 ^= $subkeyItem[2 * $r + 1];
-                }
-                $x[$bmul2] = $xb;
-                $x[$bmul2 + 1] = $xb1;
+                $xb ^= $subkeyItem[$rmul2];
+                $xb1 ^= $subkeyItem[$rmul2 + 1];
             }
+            $x0 = $xb;
+            $x1 = $xb1;
+
+            // branch 2
+            $subkeyItem = $k[self::N_BRANCHES * $s + 1];
+            $xb = $x2;
+            $xb1 = $x3;
+            for ($r = self::ROUNDS_PER_STEP - 1; $r >= 0; $r--) {
+                $rmul2 = $r << 1;
+
+                $r2 = $xb1 ^ $xb;
+                $r2 = (($r2 << 14) | ($r2 >> 2)) & 0xFFFF;
+                $l2 = ($xb - $r2) & 0xFFFF;
+                $l2 = (($l2 << 7) | ($l2 >> 9)) & 0xFFFF;
+
+                $xb = $l2;
+                $xb1 = $r2;
+
+                $xb ^= $subkeyItem[$rmul2];
+                $xb1 ^= $subkeyItem[$rmul2 + 1];
+            }
+            $x2 = $xb;
+            $x3 = $xb1;
         }
 
-        $num = $x[3] << 48;
-        $num |= $x[2] << 32;
-        $num |= $x[1] << 16;
-        $num |= $x[0];
-
-        if ($num < 0) {
-            throw new IdDecodeException('Decrypted ID is out of valid range');
-        }
+        $num = $x3 << 48;
+        $num |= $x2 << 32;
+        $num |= $x1 << 16;
+        $num |= $x0;
 
         return $num;
     }
@@ -177,7 +221,7 @@ class Sparx64Encrypter implements EncrypterContract
     /**
      * @return array{0: int, 1: int} each half of the branch
      */
-    private function ArxRound(int $leftHalfBranch, int $rightHalfBranch): array
+    private function arxRound(int $leftHalfBranch, int $rightHalfBranch): array
     {
         $leftHalfBranch = (($leftHalfBranch << 9) | ($leftHalfBranch >> 7)) & 0xFFFF;
         $leftHalfBranch = ($leftHalfBranch + $rightHalfBranch) & 0xFFFF;
@@ -192,9 +236,9 @@ class Sparx64Encrypter implements EncrypterContract
      *
      * @param array<non-negative-int, int> $key
      */
-    private function KPerm64128(array &$key, int $roundConstant): void
+    private function kPerm64128(array &$key, int $roundConstant): void
     {
-        [$key[0], $key[1]] = $this->ArxRound($key[0], $key[1]);
+        [$key[0], $key[1]] = $this->arxRound($key[0], $key[1]);
         $key[2] = ($key[2] + $key[0]) & 0xFFFF;
         $key[3] = ($key[3] + $key[1]) & 0xFFFF;
         $key[7] = ($key[7] + $roundConstant) & 0xFFFF;
@@ -216,15 +260,15 @@ class Sparx64Encrypter implements EncrypterContract
         $subkeys = [];
         $total = (self::N_BRANCHES * self::N_STEPS) + 1;
         for ($c = 0; $c < $total; $c++) {
-            $subkeys[$c] = \array_slice($masterKey, 0, 2 * self::ROUNDS_PER_STEP);
-            $this->KPerm64128($masterKey, $c + 1);
+            $subkeys[$c] = \array_slice($masterKey, 0, self::ROUNDS_PER_STEP << 1);
+            $this->kPerm64128($masterKey, $c + 1);
         }
 
         return $subkeys;
     }
 
-    public function getSerializer(): SerializerContract
+    public function maxOutputLength(): int
     {
-        return $this->serializer;
+        return $this->serializer->getMaxEncodedLength();
     }
 }

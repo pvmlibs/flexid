@@ -1,4 +1,4 @@
-FROM alpine:3.23
+FROM alpine:edge
 
 ARG DOCKER_USER=phpuser
 ARG PHP_VERSION
@@ -16,8 +16,6 @@ RUN apk add --update \
     "php$PHP_VERSION"-pcntl \
     "php$PHP_VERSION"-phar \
     "php$PHP_VERSION"-iconv \
-    "php$PHP_VERSION"-spx \
-    "php$PHP_VERSION"-pecl-pcov \
     "php$PHP_VERSION"-apcu \
     "php$PHP_VERSION"-bcmath \
     "php$PHP_VERSION"-gmp \
@@ -35,7 +33,7 @@ RUN apk add --update \
     chown -R $DOCKER_USER:$DOCKER_USER /var/www && \
     ln -s /usr/bin/php$PHP_VERSION /usr/bin/php || true
 
-RUN echo -e "apc.enabled=1\napc.enable_cli=1" >> /etc/"php$PHP_VERSION"/php.ini
+RUN echo -e "apc.enabled=1\napc.enable_cli=1\nopcache.enable=1\nopcache.enable_cli=1\nopcache.jit=function" >> /etc/"php$PHP_VERSION"/php.ini
 
 USER $DOCKER_USER
 WORKDIR /var/www

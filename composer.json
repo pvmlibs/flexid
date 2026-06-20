@@ -49,16 +49,17 @@
   "suggest": {
     "ext-redis": "Faster Redis/Valkey communication",
     "ext-apcu": "Enables APCu worker resolver",
-    "ext-bcmath": "Enables serializer for encrypted id and signer with custom alphabet (shorter output)",
-    "ext-gmp": "Enables serializer for encrypted id and signer with custom alphabet (shorter output)",
-    "ext-sodium": "Enables fast SipHash algorithm for signing id",
-    "ext-mbstring": "Enables alphabet validation against multibyte characters"
+    "ext-bcmath": "Enables slightly shorter output from encrypters and signer using CustomSerializer",
+    "ext-gmp": "Enables slightly shorter output from encrypters and signer using CustomSerializer",
+    "ext-sodium": "Enables fast SipHash algorithm for signing id and XChaCha20Encrypter",
+    "ext-mbstring": "Enables alphabet validation against multibyte characters",
+    "ext-openssl": "Enables AesEncrypter"
   },
   "scripts": {
     "check": [
       "vendor/bin/php-cs-fixer check",
-      "php -d memory_limit=400M vendor/bin/phpstan",
-      "vendor/bin/phpunit --display-incomplete --display-skipped --display-deprecations --display-errors --display-notices --display-warnings"
+      "php -d memory_limit=400M -d pcov.enabled=0 vendor/bin/phpstan",
+      "vendor/bin/phpunit --display-incomplete --display-skipped --display-deprecations --display-errors --display-notices --display-warnings --no-coverage"
     ]
   }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Resolvers;
 
+use Pvmlibs\FlexId\Contracts\WorkerResolverContract;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\VO\IdConfiguration;
 

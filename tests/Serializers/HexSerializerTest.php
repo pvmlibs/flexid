@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Serializers\HexSerializer;
 use Tests\Internal\HasBackwardCompatibilityTesting;
-use Tests\Internal\HasIdCharDistributionTesting;
+use Tests\Internal\HasCharDistributionTesting;
 use Tests\Serializers\HasSerializerTesting;
 
 /**
@@ -17,7 +17,7 @@ use Tests\Serializers\HasSerializerTesting;
 final class HexSerializerTest extends TestCase
 {
     use HasSerializerTesting;
-    use HasIdCharDistributionTesting;
+    use HasCharDistributionTesting;
     use HasBackwardCompatibilityTesting;
 
     public function testSerializeDeserializeWithDefaultAlphabet(): void
@@ -40,12 +40,6 @@ final class HexSerializerTest extends TestCase
         $serializer->deserialize('0123456789abcref');
     }
 
-    public function testIsConstantLength(): void
-    {
-        $serializer = new HexSerializer();
-        $this::assertTrue($serializer->isConstantLength());
-    }
-
     public function testEvenCharsDistribution(): void
     {
         $encoder = new HexSerializer();
@@ -53,12 +47,7 @@ final class HexSerializerTest extends TestCase
         $total = 1000;
         $ids = new \SplFixedArray($total);
         for ($i = 0; $i < $total; $i++) {
-            $ids[$i] = $encoder->serialize([
-                \random_int(0, 0xFFFF),
-                \random_int(0, 0xFFFF),
-                \random_int(0, 0xFFFF),
-                \random_int(0, 0xFFFF),
-            ]);
+            $ids[$i] = $encoder->serialize(random_int(PHP_INT_MIN, PHP_INT_MAX));
         }
         $maxDeviations = $this->getMaxDeviation($ids, $encoder->getAlphabet());
         // max deviation 2 times as random one from mean
@@ -68,11 +57,6 @@ final class HexSerializerTest extends TestCase
     public function testBackwardCompatibility(): void
     {
         $encoder = new HexSerializer();
-        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->serialize([
-            $id,
-            $id,
-            $id,
-            $id,
-        ]), 0xFFFF, 'HexSerializer');
+        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->serialize($id), PHP_INT_MIN, PHP_INT_MAX, 'HexSerializer');
     }
 }

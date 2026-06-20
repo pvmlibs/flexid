@@ -6,6 +6,8 @@ namespace Pvmlibs\FlexId\Resolvers;
 
 use Predis\Client as PredisClient;
 use Predis\Connection\ConnectionException;
+use Pvmlibs\FlexId\Contracts\WorkerResolverContract;
+use Pvmlibs\FlexId\Contracts\WorkerResolverHasTTLContract;
 use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
 use Pvmlibs\FlexId\VO\IdConfiguration;

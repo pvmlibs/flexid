@@ -9,7 +9,7 @@ trait HasBackwardCompatibilityTesting
     /**
      * @param \Closure(int $id): string $feed
      */
-    private function validateBackwardCompatibility(\Closure $feed, int $maxRange, string $name): void
+    private function validateBackwardCompatibility(\Closure $feed, int $minRange, int $maxRange, string $name): void
     {
         $incrementHash = hash_init('sha256');
 
@@ -18,9 +18,13 @@ trait HasBackwardCompatibilityTesting
             \hash_update($incrementHash, $feed($i));
         }
 
+        if ($minRange >= $maxRange) {
+            $this::fail('min range is larger than the max range');
+        }
+
         // across whole range
         $step = \intdiv($maxRange, 1000);
-        for ($i = 1000; $i < $maxRange; $i += $step) {
+        for ($i = $minRange; $i < $maxRange; $i += $step) {
             \hash_update($incrementHash, $feed($i));
         }
 
@@ -28,6 +32,8 @@ trait HasBackwardCompatibilityTesting
         \hash_update($incrementHash, $feed($maxRange));
         $hash = \hash_final($incrementHash);
 
-        $this::assertSame($hash, file_get_contents(__DIR__ . "/BackwardCompatibility/{$name}.txt"), \get_called_class() . ' is not backward compatible');
+        // file_put_contents(__DIR__ . "/BackwardCompatibility/{$name}.txt", $hash);
+
+        $this::assertSame($hash, \file_get_contents(__DIR__ . "/BackwardCompatibility/{$name}.txt"), "{$name}  is not backward compatible");
     }
 }

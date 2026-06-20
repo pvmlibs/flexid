@@ -4,27 +4,23 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Serializers;
 
+use Pvmlibs\FlexId\Contracts\SerializerContract;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
-use Pvmlibs\FlexId\Exceptions\IdEncodeException;
 
 /**
  * Provides fixed-length output with 16-characters alphabet.
- * Fastest from serializers but not customizable.
+ * Fast but not customizable.
  */
 class HexSerializer implements SerializerContract
 {
     private int $maxLength = 16;
 
-    public function serialize(array $data): string
+    public function serialize(int $data): string
     {
-        if ($data[0] > 0xFFFF || $data[1] > 0xFFFF || $data[2] > 0xFFFF || $data[3] > 0xFFFF) {
-            throw new IdEncodeException('Out of range value for serializer');
-        }
-
-        return \bin2hex(\pack('n4', ...$data));
+        return \bin2hex(\pack('J', $data));
     }
 
-    public function deserialize(string $data): array
+    public function deserialize(string $data): int
     {
         if (\strlen($data) !== $this->maxLength) {
             throw new IdDecodeException('Id has incorrect length');
@@ -37,13 +33,13 @@ class HexSerializer implements SerializerContract
             throw new IdDecodeException('Failed to convert string id to binary format');
         }
 
-        $unpacked = unpack('n4', $number);
+        $unpacked = @unpack('J', $number);
 
         if ($unpacked === false) {
             throw new IdDecodeException('Cannot unpack hex string to 4 unsigned shorts');
         }
 
-        return \array_values($unpacked);
+        return $unpacked[1];
     }
 
     public function getMaxEncodedLength(): int
@@ -54,10 +50,5 @@ class HexSerializer implements SerializerContract
     public function getAlphabet(): string
     {
         return '0123456789abcdef';
-    }
-
-    public function isConstantLength(): bool
-    {
-        return true;
     }
 }

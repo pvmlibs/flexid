@@ -29,10 +29,11 @@ final class GeneratorWithStaticResolverTest extends TestCase
         $total = 1000;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     public function testSubsequentProcessGenerate(): void
@@ -45,10 +46,11 @@ final class GeneratorWithStaticResolverTest extends TestCase
         for ($i = 0; $i < $total; $i++) {
             $resolver = new StaticWorkerResolver(workerHandlerFn: fn () => $workerId, workersBits: 20);
             $generator = new FlexIdGenerator(workerResolver: $resolver);
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 
     public function testGenerateShort(): void
@@ -58,9 +60,10 @@ final class GeneratorWithStaticResolverTest extends TestCase
         $total = 10;
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
-            $ids[] = $generator->id();
+            $id = $generator->id();
+            $ids[$id] = $id;
         }
 
-        $this::assertCount($total, \array_unique($ids));
+        $this::assertCount($total, $ids);
     }
 }

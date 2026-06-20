@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Signers;
 
-use Pvmlibs\FlexId\Signers\SignerContract;
+use Pvmlibs\FlexId\Contracts\SignerContract;
 
 trait HasSignerTesting
 {
@@ -51,5 +51,11 @@ trait HasSignerTesting
         }
 
         $this::assertCount(\count($signedIds), \array_unique($signedIds));
+
+        $signedNoAD = $signer->getSignedId('abcdef');
+        $signedWithAD = $signer->getSignedId('abcdef', 'ad');
+        if ($signer->maxOutputLength() > 2) {
+            $this::assertNotSame($signedNoAD, $signedWithAD);
+        }
     }
 }

@@ -1,0 +1,39 @@
+PHP: 80507
+Test with 10k operations:
+FlexIdGenerator with StaticWorkerResolver         3,861,591 ops/s
+FlexIdGenerator with RandomWorkerResolver         1,868,891 ops/s
+BaseSerializer serialize                          2,100,734 ops/s
+BaseSerializer deserialize                        1,658,946 ops/s
+CustomSerializer (positive int) serialize         1,760,244 ops/s
+CustomSerializer (positive int) deserialize       1,689,146 ops/s
+CustomSerializer (full range bcmath) serialize    1,162,699 ops/s
+CustomSerializer (full range bcmath) deserialize  1,106,927 ops/s
+CustomSerializer (full range gmp) serialize       1,232,817 ops/s
+CustomSerializer (full range gmp) deserialize     1,080,921 ops/s
+HashSerializer serialize                          1,309,000 ops/s
+HashSerializer deserialize                        1,127,885 ops/s
+HexSerializer serialize                           7,176,438 ops/s
+HexSerializer deserialize                         6,634,186 ops/s
+Base64Serializer serialize                        5,348,403 ops/s
+Base64Serializer deserialize                      4,428,345 ops/s
+Sparx64Encrypter encrypt                          271,522 ops/s
+Sparx64Encrypter decrypt                          256,186 ops/s
+AesEncrypter encrypt                              303,604 ops/s
+AesEncrypter decrypt                              274,772 ops/s
+XChaCha20Encrypter encrypt                        651,306 ops/s
+XChaCha20Encrypter decrypt                        881,888 ops/s
+Signer (siphash + HexSerializer) sign             1,893,738 ops/s
+Signer (siphash + HexSerializer) verify           1,641,823 ops/s
+Signer (sha256 + BaseSerializer) sign             600,173 ops/s
+Signer (sha256 + BaseSerializer) verify           536,371 ops/s
+
+Encode 100 ids
+CustomSerializer encode                      0.061 ms
+HashSerializer encode                        0.078 ms
+HexSerializer encode                         0.013 ms
+Base64Serializer encode                      0.022 ms
+
+Encrypt + sign 100 ids
+Sparx64Encrypter 128bit key, 64bit sign      0.550 ms
+AesEncrypter 128bit key, 64bit sign          0.336 ms
+XChaCha20Encrypter 256bit key, 128bit sign   0.166 ms

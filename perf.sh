@@ -1,5 +1,3 @@
 #!/usr/bin/env sh
 
-echo "------ RUN PERF TEST------\n"
-nice -20 docker exec flexid_php84 php src/Scripts/perf.php $@
-
+nice -20 docker exec flexid_php85 php -dopcache.enable=0 src/Scripts/perf.php $@

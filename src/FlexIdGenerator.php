@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId;
 
+use Pvmlibs\FlexId\Contracts\IdGeneratorContract;
+use Pvmlibs\FlexId\Contracts\WorkerResolverContract;
+use Pvmlibs\FlexId\Contracts\WorkerResolverHasTTLContract;
 use Pvmlibs\FlexId\Exceptions\IdConfigurationException;
 use Pvmlibs\FlexId\Exceptions\IdGeneratorException;
 use Pvmlibs\FlexId\Exceptions\NoWorkerAvailableException;
-use Pvmlibs\FlexId\Resolvers\WorkerResolverContract;
-use Pvmlibs\FlexId\Resolvers\WorkerResolverHasTTLContract;
 use Pvmlibs\FlexId\VO\IdConfiguration;
 
 /**
@@ -17,7 +18,7 @@ use Pvmlibs\FlexId\VO\IdConfiguration;
  * IDs can be generated up to ~292 years from timestampOffset.
  * Use worker resolver that best suit your needs.
  */
-class FlexIdGenerator
+class FlexIdGenerator implements IdGeneratorContract
 {
     private int $timestepMetaData = 0;
     private int $sequence = 0;

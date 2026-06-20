@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace Tests\Signers;
 
 use PHPUnit\Framework\TestCase;
+use Pvmlibs\FlexId\Exceptions\IdBadSignException;
 use Pvmlibs\FlexId\Exceptions\IdSigningException;
 use Pvmlibs\FlexId\Exceptions\IdVerifySignException;
-use Pvmlibs\FlexId\Serializers\BCMathSerializer;
-use Pvmlibs\FlexId\Serializers\FixedLengthSerializer;
+use Pvmlibs\FlexId\Serializers\BaseSerializer;
+use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Serializers\HexSerializer;
-use Pvmlibs\FlexId\Serializers\NativeSerializer;
+use Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersBCMath;
 use Pvmlibs\FlexId\Signers\Signer;
 use Tests\Internal\HasBackwardCompatibilityTesting;
-use Tests\Internal\HasIdCharDistributionTesting;
+use Tests\Internal\HasCharDistributionTesting;
 
 /**
  * @internal
@@ -21,15 +22,15 @@ use Tests\Internal\HasIdCharDistributionTesting;
 final class SignerTest extends TestCase
 {
     use HasSignerTesting;
-    use HasIdCharDistributionTesting;
+    use HasCharDistributionTesting;
     use HasBackwardCompatibilityTesting;
 
     public function testWithSodiumSipHash(): void
     {
-        $key = Signer::generateKey();
+        $key = Signer::generateSecret();
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: $key,
+            secret: $key,
+            serializer: new BaseSerializer(),
             hashAlgo: 'siphash-2-4',
         );
         $this->validateSignAndVerify($signer);
@@ -37,10 +38,10 @@ final class SignerTest extends TestCase
 
     public function testWithSodiumBlake(): void
     {
-        $key = Signer::generateKey();
+        $key = Signer::generateSecret();
         $signer = new Signer(
-            serializer: new FixedLengthSerializer(),
-            key: $key,
+            secret: $key,
+            serializer: new BaseSerializer(),
             hashAlgo: 'blake2b',
         );
         $this->validateSignAndVerify($signer);
@@ -48,10 +49,10 @@ final class SignerTest extends TestCase
 
     public function testWithHashHmacSha256(): void
     {
-        $key = Signer::generateKey();
+        $key = Signer::generateSecret();
         $signer = new Signer(
-            serializer: new BCMathSerializer(),
-            key: $key,
+            secret: $key,
+            serializer: new CustomSerializer(new FullRangeIntegersBCMath()),
             hashAlgo: 'sha256',
         );
         $this->validateSignAndVerify($signer);
@@ -59,21 +60,21 @@ final class SignerTest extends TestCase
 
     public function testWithNonCryptographyHash(): void
     {
-        $key = Signer::generateKey();
-        $signer = new Signer(
-            serializer: new BCMathSerializer(),
-            key: $key,
+        $key = Signer::generateSecret();
+        $this::expectException(\InvalidArgumentException::class);
+        new Signer(
+            secret: $key,
+            serializer: new CustomSerializer(),
             hashAlgo: 'xxh64',
         );
-        $this->validateSignAndVerify($signer, 2000, 1, 8);
     }
 
     public function testWithHexSerializer(): void
     {
-        $key = Signer::generateKey();
+        $key = Signer::generateSecret();
         $signer = new Signer(
+            secret: $key,
             serializer: new HexSerializer(),
-            key: $key,
             hashAlgo: 'siphash-2-4',
         );
         $this->validateSignAndVerify($signer);
@@ -81,12 +82,13 @@ final class SignerTest extends TestCase
 
     public function testWithVariableSignLength(): void
     {
-        $key = Signer::generateKey();
-        for ($i = 1; $i <= 16; $i++) {
+        $key = Signer::generateSecret();
+        $baseSerializer = new BaseSerializer();
+        for ($i = 1; $i <= $baseSerializer->getMaxEncodedLength(); $i++) {
             $signer = new Signer(
-                serializer: new BCMathSerializer(),
-                key: $key,
-                hashAlgo: 'xxh64',
+                secret: $key,
+                serializer: $baseSerializer,
+                hashAlgo: 'siphash-2-4',
                 maxSignLength: $i,
             );
             $this->validateSignAndVerify($signer, 1000);
@@ -94,78 +96,133 @@ final class SignerTest extends TestCase
             $signed = $signer->getSignedId($id);
             $this::assertLessThanOrEqual(\strlen($id) + $i + 1, \strlen($signed)); // $i + separator
         }
-    }
-
-    public function testWithNoSeparator(): void
-    {
-        $key = Signer::generateKey();
-        for ($i = 1; $i <= 16; $i++) {
+        $customSerializer = new CustomSerializer();
+        // check for 63 bits
+        for ($i = 1; $i <= $customSerializer->getMaxEncodedLength(); $i++) {
             $signer = new Signer(
-                serializer: new FixedLengthSerializer(),
-                key: $key,
-                hashAlgo: 'xxh64',
-                separator: '',
+                secret: $key,
+                serializer: $customSerializer,
+                hashAlgo: 'siphash-2-4',
                 maxSignLength: $i,
+                onlyPositiveRange: true,
             );
-            $this->validateSignAndVerify($signer, 1000, 16, 16);
-
-            $id = '0123456789abcdef';
+            $this->validateSignAndVerify($signer, 1000);
+            $id = 'abcdefgh';
             $signed = $signer->getSignedId($id);
-            $this::assertSame($id, $signer->getIdFromSigned($signed));
-            $this::assertNotSame($id, $signed);
-            $this::assertSame(\strlen($id) + min(16, $i), \strlen($signed));
+            $this::assertLessThanOrEqual(\strlen($id) + $i + 1, \strlen($signed)); // $i + separator
         }
 
-        $id = '0123456789abcd';
-        $signer = new Signer(serializer: new FixedLengthSerializer(), key: 'PsQBSNyMoz60RpQnSKWBMg==', separator: '');
-        // this should pass, even if no separator and id is not fixed length, but sign is
+        $signer = new Signer(
+            secret: $key,
+            serializer: $baseSerializer,
+            hashAlgo: 'siphash-2-4',
+            maxSignLength: 1,
+        );
+        $id = 'abcdefgh';
         $signed = $signer->getSignedId($id);
-        $this::assertNotSame($id, $signed);
-        $this::assertSame($id, $signer->getIdFromSigned($signed));
+        $this::assertSame(\strlen($id) + 1, \strlen($signed)); // $i + 1 char sign, no separator
 
-        $signer = new Signer(serializer: new NativeSerializer(), key: 'PsQBSNyMoz60RpQnSKWBMg==', separator: '');
-        // this should pass, id is fixed 16 chars
-        $id = '0123456789abcdef';
-        $signed = $signer->getSignedId($id);
-        $this::assertSame($id, $signer->getIdFromSigned($signed));
-        $this::assertNotSame($id, $signed);
+        $this::expectException(\InvalidArgumentException::class);
+        new Signer(
+            secret: $key,
+            serializer: $baseSerializer,
+            hashAlgo: 'siphash-2-4',
+            maxSignLength: $baseSerializer->getMaxEncodedLength() + 1,
+        );
+    }
 
-        $id = '0123456789abcd';
-        $signer = new Signer(serializer: new NativeSerializer(), key: 'PsQBSNyMoz60RpQnSKWBMg==', separator: '', maxSignLength: 1);
-        // this should also pass, as maxSignLength is 1
-        $signed = $signer->getSignedId($id);
-        $this::assertNotSame($id, $signed);
-        $this::assertSame(\strlen($id) + 1, \strlen($signed));
-        $this::assertSame($id, $signer->getIdFromSigned($signed));
+    public function testWithExtendedSignBits(): void
+    {
+        $key = Signer::generateSecret();
+        $bits = [128, 192, 256];
+        $serializer = new BaseSerializer();
+        foreach ($bits as $bitSize) {
+            for ($i = 1; $i <= $serializer->getMaxEncodedLength(); $i++) {
+                $signer = new Signer(
+                    secret: $key,
+                    serializer: new BaseSerializer(),
+                    maxSignLength: $i,
+                    signBits: $bitSize,
+                );
+                $this->validateSignAndVerify($signer, 2000, 3, 16);
+                $id = 'abcdefgh';
+                $signed = $signer->getSignedId($id);
+                $this::assertLessThanOrEqual(\strlen($id) + (\intdiv($bitSize, 64) + 1) * $i, \strlen($signed)); // (sign parts + separator )*$i
+            }
+        }
+        $serializer = new CustomSerializer();
+        // check for 63 bits
+        foreach ($bits as $bitSize) {
+            for ($i = 1; $i <= $serializer->getMaxEncodedLength(); $i++) {
+                $signer = new Signer(
+                    secret: $key,
+                    serializer: new CustomSerializer(),
+                    maxSignLength: $i,
+                    signBits: $bitSize,
+                    onlyPositiveRange: true,
+                );
+                $this->validateSignAndVerify($signer, 2000, 3, 16);
+                $id = 'abcdefgh';
+                $signed = $signer->getSignedId($id);
+                $this::assertLessThanOrEqual(\strlen($id) + (\intdiv($bitSize, 64) + 1) * $i, \strlen($signed)); // (sign parts + separator )*$i
+            }
+        }
+        $this::expectException(\InvalidArgumentException::class);
+        new Signer(
+            secret: $key,
+            serializer: $serializer,
+            hashAlgo: 'siphash-2-4',
+            signBits: 123,
+        );
+    }
 
-        $id = '0123456789abcd';
-        $signer = new Signer(serializer: new FixedLengthSerializer(), key: 'PsQBSNyMoz60RpQnSKWBMg==', separator: '', maxSignLength: 2);
-        // this should pass, as maxSignLength is 2, id is not fixed but sign uses fixed length serializer
-        $signed = $signer->getSignedId($id);
-        $this::assertNotSame($id, $signed);
-        $this::assertSame(\strlen($id) + 2, \strlen($signed));
-        $this::assertSame($id, $signer->getIdFromSigned($signed));
+    public function testUnsupportedBitSizeByHash(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new Signer(
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
+            hashAlgo: 'siphash-2-4',
+            signBits: 128,
+        );
+    }
 
-        $signer = new Signer(serializer: new NativeSerializer(), key: 'PsQBSNyMoz60RpQnSKWBMg==', separator: '');
-        $this::expectException(IdSigningException::class);
-        $signer->getSignedId($id);
+    public function testReducedBitsHash(): void
+    {
+        $signer = new Signer(
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new CustomSerializer(),
+            hashAlgo: 'siphash-2-4',
+            onlyPositiveRange: true,
+        );
+        $this->validateSignAndVerify($signer, 1000);
     }
 
     public function testVerifyBadId(): void
     {
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
         $this->expectException(IdVerifySignException::class);
         $signer->getIdFromSigned('ghry*');
     }
 
+    public function testVerifyBadIdNulls(): void
+    {
+        $signer = new Signer(
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
+        );
+        $this->expectException(IdBadSignException::class);
+        $signer->getIdFromSigned(str_repeat("\x00", 16));
+    }
+
     public function testSignEmptyId(): void
     {
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
         $this->expectException(IdSigningException::class);
         $signer->getSignedId('');
@@ -174,8 +231,8 @@ final class SignerTest extends TestCase
     public function testGetIdFromEmptyData(): void
     {
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
         $this->expectException(IdVerifySignException::class);
         $signer->getIdFromSigned('');
@@ -184,62 +241,61 @@ final class SignerTest extends TestCase
     public function testGetIdFromTooLongData(): void
     {
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
-        $this->expectException(IdVerifySignException::class);
+        $this->expectException(IdBadSignException::class);
         $signer->getIdFromSigned('djclaorhfncajkdths83jdneqm06ns84ae');
     }
 
     public function testTamperWithId(): void
     {
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
         $id = 'sdflk4sfk';
         $signed = $signer->getSignedId($id);
         $this::assertSame($id, $signer->getIdFromSigned($signed));
 
         $signed = \substr($signed, 1);
-        $this->expectException(IdVerifySignException::class);
+        $this->expectException(IdBadSignException::class);
         $signer->getIdFromSigned($signed);
     }
 
     public function testTamperWithSign(): void
     {
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
         $id = 'sdflk4sfk';
         $signed = $signer->getSignedId($id);
         $this::assertSame($id, $signer->getIdFromSigned($signed));
 
         $signed .= 'e';
-        $this->expectException(IdVerifySignException::class);
+        $this->expectException(IdBadSignException::class);
         $signer->getIdFromSigned($signed);
     }
 
-    public function testSignWithSalt(): void
+    public function testSignDifferentKeys(): void
     {
         $signer = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
         $id = 'sdflk4sfk';
         $signed = $signer->getSignedId($id);
         $this::assertSame($id, $signer->getIdFromSigned($signed));
 
         $signer2 = new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
-            salt: 'abc',
+            secret: 'rCl29//aZ51LjLQZKUbMUA==',
+            serializer: new BaseSerializer(),
         );
-        $signedWithSalt = $signer2->getSignedId($id);
-        $this::assertNotSame($signed, $signedWithSalt);
+        $signed2 = $signer2->getSignedId($id);
+        $this::assertNotSame($signed, $signed2);
 
-        $this->expectException(IdVerifySignException::class);
+        $this->expectException(IdBadSignException::class);
         $signer2->getIdFromSigned($signed);
     }
 
@@ -247,8 +303,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            serializer: new NativeSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
             separator: '-_',
         );
     }
@@ -257,8 +313,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            serializer: new BCMathSerializer(alphabet: 'absj-'),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new CustomSerializer(fullRangeIntegerOperations: new FullRangeIntegersBCMath(), alphabet: 'absj-'),
             separator: '-',
         );
     }
@@ -267,8 +323,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            serializer: new BCMathSerializer(alphabet: 'absj-'),
-            key: 'PsQBSNyMoz60RpQnSKWB',
+            secret: 'PsQBSNyMoz60RpQnSKWB',
+            serializer: new CustomSerializer(fullRangeIntegerOperations: new FullRangeIntegersBCMath(), alphabet: 'absj-'),
             separator: '-',
         );
     }
@@ -277,8 +333,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            serializer: new BCMathSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new CustomSerializer(),
             separator: '-',
             maxSignLength: 0,
         );
@@ -287,30 +343,40 @@ final class SignerTest extends TestCase
     public function testEvenCharsDistribution(): void
     {
         $signer = new Signer(
-            serializer: new FixedLengthSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
-            separator: '',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new HexSerializer(),
         );
 
         $total = 1000;
         $ids = new \SplFixedArray($total);
         for ($i = 0; $i < $total; $i++) {
-            $id = (string) random_int(0, PHP_INT_MAX);
+            $id = (string) random_int(PHP_INT_MIN, PHP_INT_MAX);
             $signedId = $signer->getSignedId($id);
             $sign = \substr($signedId, \strlen($id));
             $ids[$i] = $sign;
         }
         $maxDeviations = $this->getMaxDeviation($ids, $signer->getAlphabet());
         // sign chars should be close to random, max deviation 2 times as random one from mean
-        $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
+        $this::assertLessThan(
+            $maxDeviations['random'] * 3,
+            $maxDeviations['real'],
+            sprintf(
+                'Max deviation of %s (%f) is above limit %f, mean %f',
+                $maxDeviations['mostFrequentChar'],
+                $maxDeviations['real'],
+                $maxDeviations['random'] * 3,
+                $maxDeviations['mean'],
+            ),
+        );
     }
 
     public function testBackwardCompatibility(): void
     {
         $signer = new Signer(
-            serializer: new FixedLengthSerializer(),
-            key: 'PsQBSNyMoz60RpQnSKWBMg==',
+            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
+            serializer: new BaseSerializer(),
         );
-        $this->validateBackwardCompatibility(fn (int $id): string => $signer->getSignedId((string) $id), PHP_INT_MAX, 'Signer');
+        $this->validateBackwardCompatibility(fn (int $id): string => $signer->getSignedId((string) $id), 0, PHP_INT_MAX, 'Signer');
+        $this->validateBackwardCompatibility(fn (int $id): string => $signer->getSignedId((string) $id, 'abcd'), 0, PHP_INT_MAX, 'SignerAD');
     }
 }

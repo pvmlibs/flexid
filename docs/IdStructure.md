@@ -1,5 +1,22 @@
 ## ID structure
 
+ID uses 63 bits (sign bit is not used). There are 4 groups of bits:
+
+```mermaid
+block-beta
+    block: ID
+        A["timestamp 35-62 bits"]
+        B["workers 0-20 bits"]
+        C["sequence 0-30 bits"]
+        D["groups 0-30"]
+    end
+```
+
+ID lifespan range varies from 292 (default) to 292271 years, depending on timestamp bitshift config. Each group bits
+count can vary with assumption that the sum of workers, sequence, groups bits and timestamp bitshift value must be <= 30.
+Bits configuration and timestamp bitshift directly affects theoretic throughput, timestamp bitshift also defines max ID
+lifespan.
+
 Definitions:
 
 1. metadata bits: workers, sequence and groups bits (max sum 30)

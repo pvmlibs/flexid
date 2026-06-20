@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Internal;
 
-use Pvmlibs\FlexId\Resolvers\WorkerResolverContract;
-use Pvmlibs\FlexId\Resolvers\WorkerResolverHasTTLContract;
+use Pvmlibs\FlexId\Contracts\WorkerResolverContract;
+use Pvmlibs\FlexId\Contracts\WorkerResolverHasTTLContract;
 use Pvmlibs\FlexId\VO\IdConfiguration;
 
 class TestingWorkerResolver implements WorkerResolverContract, WorkerResolverHasTTLContract
