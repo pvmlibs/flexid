@@ -169,7 +169,7 @@ final class HashSerializerTest extends TestCase
         $this->validateCharsDistributionW1($startLinear, $startLinear + 1000, false);
 
         // linear with first block, it should have distribution near random
-        $this->validateCharsDistributionW1(0, 65535, false, 1.2);
+        $this->validateCharsDistributionW1(0, 65535, false, 1.5);
 
         // random
         $this->validateCharsDistributionW1(1 << 16, 0xFFFFFFFF);

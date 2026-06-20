@@ -41,11 +41,7 @@ jobs:
           ini-values: apc.enabled=1, apc.enable_cli=1
 
       - name: Install dependencies
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
+        run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
       - name: Static analyze check
         run: php -d memory_limit=400M vendor/bin/phpstan
