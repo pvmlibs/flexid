@@ -33,7 +33,7 @@ jobs:
           tools: composer:v2
           coverage: none
           extensions: redis, pcntl, apcu, bcmath, openssl
-          ini-values: apc.enabled=1, apc.enable_cli=1, opcache.enable=1, opcache.enable_cli=1, opcache.jit=function
+          ini-values: apc.enabled=1, apc.enable_cli=1
 
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
