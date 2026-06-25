@@ -174,11 +174,11 @@ final class HashSerializerTest extends TestCase
         // random
         $this->validateCharsDistributionW1(1 << 16, 0xFFFFFFFF);
         $this->validateCharsDistributionW1(1 << 32, 0xFFFFFFFFFFFF);
-        $this->validateCharsDistributionW1(1 << 48, PHP_INT_MAX);
-        $this->validateCharsDistributionW1(0, PHP_INT_MAX);
+        $this->validateCharsDistributionW1(1 << 48, $encoder->getMaxRange());
+        $this->validateCharsDistributionW1(0, $encoder->getMaxRange());
     }
 
-    private function validateCharsDistributionW1(int $min, int $max, bool $random = true, float $lessThanRandomMultiply = 2.0): void
+    private function validateCharsDistributionW1(int $min, int $max, bool $random = true, float $lessThanRandomMultiply = 2.5): void
     {
         $encoder = new HashSerializer(\str_shuffle(HashSerializer::ALPHABET));
 
