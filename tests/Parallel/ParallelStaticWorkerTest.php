@@ -77,6 +77,6 @@ final class ParallelStaticWorkerTest extends TestCase
         }
 
         $results = \array_unique($results);
-        $this::assertCount($idsPerProcess * $taskCount, $results);
+        $this::assertSame($idsPerProcess * $taskCount, count($results), 'There are duplicates');
     }
 }

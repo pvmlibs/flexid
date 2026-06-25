@@ -109,7 +109,9 @@ trait HasSerializerTesting
         }
 
         $this::assertSame($finalHashSerialized = \hash_final($incrementHashToSerialize), \hash_final($incrementHashDeserialized));
-        $this::assertCount($expected, $serializedIds);
+
+        // this is more efficient than $this::assertCount, especially with large arrays
+        $this::assertSame($expected, count($serializedIds), 'There are duplicates');
 
         return $finalHashSerialized;
     }

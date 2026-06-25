@@ -133,8 +133,8 @@ final class AesEncrypterTest extends TestCase
         $encrypted = [];
         $this->runBatch($encrypter, $encrypted);
         $ad = \random_bytes(8);
-        $this->runBatch($encrypter, $encrypted, $ad);
-        $this::assertCount(\count($encrypted), \array_unique($encrypted));
+        $expected = $this->runBatch($encrypter, $encrypted, $ad);
+        $this::assertCount($expected, $encrypted, 'There are duplicates');
 
         $encryptedNoAD = $encrypter->encrypt(100);
         $encryptedWithAD = $encrypter->encrypt(100, 'abc');

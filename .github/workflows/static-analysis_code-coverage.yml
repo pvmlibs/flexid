@@ -1,4 +1,4 @@
-name: static analysis
+name: static analysis and code coverage
 on:
   workflow_dispatch:
   pull_request:
@@ -6,8 +6,8 @@ on:
     branches:
       - master
 jobs:
-  tests:
-    runs-on: ubuntu-22.04
+  static_analysis_code_coverage:
+    runs-on: ubuntu-26.04
 
     strategy:
       fail-fast: false
@@ -53,7 +53,7 @@ jobs:
           TESTING_REDIS_PORT: 6379
 
       - name: Send code coverage report to Codecov.io
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml

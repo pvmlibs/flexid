@@ -55,7 +55,7 @@ final class GeneratorWithRedisReservedResolverTest extends TestCase
             $ids[$id] = $id;
         }
 
-        $this::assertCount($total, $ids);
+        $this::assertCount($total, $ids, 'There are duplicates');
     }
 
     private function generateShortIds(\Redis|Client $redisClient): void
@@ -76,7 +76,7 @@ final class GeneratorWithRedisReservedResolverTest extends TestCase
             $ids[$id] = $id;
         }
 
-        $this::assertCount($total, $ids);
+        $this::assertCount($total, $ids, 'There are duplicates');
     }
 
     private function overflowWorkers(\Redis|Client $redisClient): void

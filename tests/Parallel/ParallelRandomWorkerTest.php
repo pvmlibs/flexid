@@ -97,7 +97,7 @@ final class ParallelRandomWorkerTest extends TestCase
         } else {
             $expectedCollisions = 0;
         }
-        $this::assertCount($idsPerProcess * $taskCount, $results);
+        $this::assertSame($idsPerProcess * $taskCount, count($results), 'Wrong result count');
 
         $results = \array_unique($results);
 

@@ -103,8 +103,7 @@ final class ParallelRedisShortReservedWorkerTest extends TestCase
             array_push($results, ...array_values(json_decode($dbRedis->get("results{$i}"), true)));
         }
 
-        $this::assertCount($idsPerProcess * $taskCount, $results);
         $results = array_unique($results);
-        $this::assertCount($idsPerProcess * $taskCount, $results, 'Found duplicate ids');
+        $this::assertSame($idsPerProcess * $taskCount, count($results), 'There are duplicates');
     }
 }

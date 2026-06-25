@@ -25,7 +25,7 @@ final class GeneratorWithRandomResolverTest extends TestCase
             $ids[$id] = $id;
         }
 
-        $this::assertCount($total, $ids);
+        $this::assertCount($total, $ids, 'There are duplicates');
     }
 
     public function testWorkersOverflow(): void
@@ -39,6 +39,6 @@ final class GeneratorWithRandomResolverTest extends TestCase
             $ids[$id] = $id;
         }
 
-        $this::assertCount($total, $ids);
+        $this::assertCount($total, $ids, 'There are duplicates');
     }
 }

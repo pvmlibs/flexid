@@ -23,6 +23,9 @@ parameters:
         - tests
     tmpDir: cache/phpstan
 
-
+    ignoreErrors:
+        -
+            # phpunit assertCount is inefficient with large arrays
+            message: '#You should use assertCount*#'
 
 

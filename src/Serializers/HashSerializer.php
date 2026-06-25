@@ -14,8 +14,8 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
  * random. For better confidentiality see encryption. Works with custom alphabets with length at least 32 characters,
  * the default one has optimized length and should not create words, but remember to use shuffled version before use.
  * Id capacity for output length with default alphabet length:
- * 3 chars: 65k
- * 4 chars: ~4mln millions
+ * 3 chars: ~65k
+ * 4 chars: ~4 millions
  * 5 chars: ~250 millions
  * 6 chars: ~13 billions.
  */

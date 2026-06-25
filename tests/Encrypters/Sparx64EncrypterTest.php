@@ -57,8 +57,8 @@ final class Sparx64EncrypterTest extends TestCase
         $encrypter = new Sparx64Encrypter(secret: $secret, serializer: $serializer);
 
         $encrypted = [];
-        $this->runBatch($encrypter, $encrypted);
-        $this::assertCount(\count($encrypted), \array_unique($encrypted));
+        $expected = $this->runBatch($encrypter, $encrypted);
+        $this::assertCount($expected, $encrypted, 'There are duplicates');
 
         $encryptedNoAD = $encrypter->encrypt(100);
         $encryptedWithAD = $encrypter->encrypt(100, 'abc');

@@ -11,7 +11,7 @@ trait HasEncrypterTesting
     /**
      * @param array<string> $encryptedIds
      */
-    private function runBatch(EncrypterContract $encrypter, array &$encryptedIds, string $ad = ''): void
+    private function runBatch(EncrypterContract $encrypter, array &$encryptedIds, string $ad = ''): int
     {
         // merging with existing array
         $expected = count($encryptedIds);
@@ -75,7 +75,9 @@ trait HasEncrypterTesting
         \hash_update($incrementHashToEncrypt, '0');
 
         $this::assertSame(\hash_final($incrementHashDecrypted), \hash_final($incrementHashToEncrypt));
-        $this::assertCount($expected, $encryptedIds);
+        $this::assertSame($expected, count($encryptedIds), 'There are duplicates');
+
+        return $expected;
     }
 
 }

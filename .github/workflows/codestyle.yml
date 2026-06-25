@@ -1,4 +1,4 @@
-name: codestyle
+name: code format
 on:
   workflow_dispatch:
   pull_request:
@@ -6,8 +6,8 @@ on:
     branches:
       - master
 jobs:
-  code-coverage:
-    name: Code Coverage
+  code-format:
+    name: Code format
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -28,5 +28,5 @@ jobs:
       - name: Install dependencies with composer
         run: composer update --no-ansi --no-interaction --no-progress
 
-      - name: Code Style check
+      - name: Code format check
         run: vendor/bin/php-cs-fixer check
