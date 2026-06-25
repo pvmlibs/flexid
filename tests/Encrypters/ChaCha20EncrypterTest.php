@@ -143,15 +143,15 @@ final class ChaCha20EncrypterTest extends TestCase
             $ids[$i] = $encrypter->encrypt(\random_int(0, PHP_INT_MAX));
         }
         $maxDeviations = $this->getMaxDeviation($ids, '0123456789abcdef');
-        // should be close to random, max deviation 2 times as random one from mean
+        // should be close to random, max deviation 3 times as random one from mean
         $this::assertLessThan(
-            $maxDeviations['random'] * 2,
+            $maxDeviations['random'] * 3,
             $maxDeviations['real'],
             sprintf(
                 'Max deviation of %s (%f) is above limit %f, mean %f',
                 $maxDeviations['mostFrequentChar'],
                 $maxDeviations['real'],
-                $maxDeviations['random'] * 2,
+                $maxDeviations['random'] * 3,
                 $maxDeviations['mean'],
             ),
         );

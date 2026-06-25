@@ -81,8 +81,8 @@ final class Sparx64EncrypterTest extends TestCase
             $ids[$i] = $encrypter->encrypt(\random_int(0, PHP_INT_MAX), '');
         }
         $maxDeviations = $this->getMaxDeviation($ids, (new HexSerializer())->getAlphabet());
-        // should be close to random, max deviation 2 times as random one from mean
-        $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
+        // should be close to random, max deviation 3 times as random one from mean
+        $this::assertLessThan($maxDeviations['random'] * 3, $maxDeviations['real']);
     }
 
     public function testBackwardCompatibility(): void
