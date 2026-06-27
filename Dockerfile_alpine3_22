@@ -34,7 +34,7 @@ RUN apk add --update \
     chown -R $DOCKER_USER:$DOCKER_USER /var/www && \
     ln -s /usr/bin/php$PHP_VERSION /usr/bin/php || true
 
-RUN echo -e "apc.enabled=1\napc.enable_cli=1\nopcache.enable=1\nopcache.enable_cli=1\nopcache.jit=function\nopcache.jit_buffer_size=64M" >> /etc/"php$PHP_VERSION"/php.ini
+RUN echo -e "apc.enabled=1\napc.enable_cli=1\nopcache.enable=1\nopcache.enable_cli=1\nopcache.jit=off" >> /etc/"php$PHP_VERSION"/php.ini
 
 USER $DOCKER_USER
 WORKDIR /var/www

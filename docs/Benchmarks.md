@@ -1,8 +1,8 @@
 ## Benchmarks
 
 For best performance, make sure you don't have loaded debugging or code coverage extensions like xdebug, pcov or make
-sure they are turned off. Opcache helps especially with JIT, but tracing option is not recommended due to instability.
-JIT=function seems to be stable.
+sure they are turned off. Opcache helps especially with JIT (2x-8x faster), but with JIT can be unstable (mainly SIGSEGV,
+depending on php version, application code and hardware - known problem in php).
 For signing, use fast hash when possible, e.g. siphash-2-4 (requires sodium extension).
 
 

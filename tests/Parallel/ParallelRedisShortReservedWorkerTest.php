@@ -41,7 +41,7 @@ final class ParallelRedisShortReservedWorkerTest extends TestCase
             sequenceBits: $sequenceBits,
             useNewWorkerOnSequenceOverflow: $newWorkerOnOverflow,
             TTLMs: $ttl,
-            resolveWorkerTrials: 4,
+            resolveWorkerTrials: 8,
             timestampBitshift: $timestampShift,
         );
         $generator = new FlexIdGenerator(workerResolver: $resolver);
