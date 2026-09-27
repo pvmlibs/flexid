@@ -72,7 +72,6 @@ class Sparx64Encrypter implements EncrypterContract
 
         $k = $this->subkeys;
         for ($s = 0; $s < self::N_STEPS; $s++) {
-            // for ($b = 0; $b < self::N_BRANCHES; $b++) {
             // branch 1
             $subkeyItem = $k[self::N_BRANCHES * $s];
             $xb = $x0;
@@ -93,7 +92,6 @@ class Sparx64Encrypter implements EncrypterContract
             }
             $x0 = $xb;
             $x1 = $xb1;
-            // }
 
             // branch 2
             $subkeyItem = $k[self::N_BRANCHES * $s + 1];

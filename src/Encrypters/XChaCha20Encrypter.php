@@ -15,6 +15,7 @@ use Pvmlibs\FlexId\Exceptions\IdDecryptException;
  * - for the same data (input id, additionalData, secret) produces different output
  * - includes authentication (128-bit)
  * - outputs 64 (base64) - 96 (hex) chars.
+ * - provides the strongest security and the best performance from other encrypters but has the longest output.
  *
  * See more https://doc.libsodium.org/doc/secret-key_cryptography/aead
  */
@@ -79,7 +80,20 @@ class XChaCha20Encrypter implements EncrypterContract
 
     public function encrypt(int $id, string $additionalData = ''): string
     {
-        $nonce = \random_bytes($this->nonceLength);
+        $totalNounces = 50;
+        static $nounces = [];
+        static $nounceIndex = 0;
+
+        // preallocate $totalNounces nounces at once - much faster for encrypting many ids
+        if ($nounceIndex === 0) {
+            $bytes = \random_bytes($this->nonceLength * $totalNounces);
+            for ($i = 0; $i < $totalNounces; $i++) {
+                $nounces[$i] = \substr($bytes, $i * $this->nonceLength, $this->nonceLength);
+            }
+        }
+
+        $nonce = $nounces[$nounceIndex];
+        $nounceIndex = ($nounceIndex + 1) % $totalNounces;
 
         $ciphertext = \sodium_crypto_aead_xchacha20poly1305_ietf_encrypt(
             message: \pack('J', $id),
@@ -104,8 +118,8 @@ class XChaCha20Encrypter implements EncrypterContract
             throw new IdDecodeException('Invalid id to decrypt');
         }
 
-        $nonce = substr($id, 0, $this->nonceLength);
-        $idPart = substr($id, $this->nonceLength);
+        $nonce = \substr($id, 0, $this->nonceLength);
+        $idPart = \substr($id, $this->nonceLength);
 
         try {
             $decrypted = \sodium_crypto_aead_xchacha20poly1305_ietf_decrypt(

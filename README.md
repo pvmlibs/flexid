@@ -156,6 +156,7 @@ $encodedId->fromPublicId($publicId); // 43581127276918784
 $id = $generator->id(); // 43581127276918784
 $publicId = $serializer->serialize($id); // LNvqjBKLnJ
 $serializer->serialize($publicId); // 43581127276918784
+$serializer->serialize(12345); // fF96
 ```
 
 Generate ID with encrypting. Encryptor can be also used to encrypt/decrypt any integer number (PHP_INT_MIN - PHP_INT_MAX):
@@ -183,7 +184,7 @@ $encryptedId->fromPublicId($publicId); // 43581127276918784
 
 // or use encryptor directly
 $id = $generator->id(); // 43581127276918784
-$publicId = $encrypter->encrypt($id,''); // yVyKqbkQDgYgR
+$publicId = $encrypter->encrypt($id); // yVyKqbkQDgYgR
 $encrypter->decrypt($publicId); // 43581127276918784
 ```
 

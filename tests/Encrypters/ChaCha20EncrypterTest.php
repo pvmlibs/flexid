@@ -90,6 +90,16 @@ final class ChaCha20EncrypterTest extends TestCase
         $this::assertSame(1000, $counter);
     }
 
+    public function testSameIdDifferentOutput(): void
+    {
+        $encrypter = new XChaCha20Encrypter(XChaCha20Encrypter::generateSecret());
+        $ids = [];
+        for ($i = 0; $i < 500; $i++) {
+            $ids[] = $encrypter->encrypt(1);
+        }
+        $this::assertCount(500, \array_unique($ids));
+    }
+
     public function testAlterCiphertextDecrypt(): void
     {
         $counter = 0;

@@ -1,0 +1,28 @@
+
+Test with 10k operations:
+FlexIdGenerator with StaticWorkerResolver         3,681,411 ops/s
+FlexIdGenerator with RandomWorkerResolver         2,008,288 ops/s
+BaseSerializer serialize                          2,191,045 ops/s
+BaseSerializer deserialize                        1,617,667 ops/s
+CustomSerializer (positive int) serialize         1,877,738 ops/s
+CustomSerializer (positive int) deserialize       1,686,222 ops/s
+CustomSerializer (full range bcmath) serialize    1,243,150 ops/s
+CustomSerializer (full range bcmath) deserialize  1,184,791 ops/s
+CustomSerializer (full range gmp) serialize       1,272,267 ops/s
+CustomSerializer (full range gmp) deserialize     1,006,126 ops/s
+HashSerializer serialize                          1,309,435 ops/s
+HashSerializer deserialize                        1,166,704 ops/s
+HexSerializer serialize                           8,321,856 ops/s
+HexSerializer deserialize                         6,484,508 ops/s
+Base64Serializer serialize                        5,269,992 ops/s
+Base64Serializer deserialize                      4,425,625 ops/s
+Sparx64Encrypter encrypt                          253,241 ops/s
+Sparx64Encrypter decrypt                          260,102 ops/s
+AesEncrypter encrypt (+sign)                      316,753 ops/s
+AesEncrypter decrypt (+sign)                      269,755 ops/s
+XChaCha20Encrypter encrypt (+sign)                1,020,627 ops/s
+XChaCha20Encrypter decrypt (+sign)                928,698 ops/s
+Signer (siphash + HexSerializer) sign             2,117,877 ops/s
+Signer (siphash + HexSerializer) verify           1,496,194 ops/s
+Signer (sha256 + BaseSerializer) sign             601,501 ops/s
+Signer (sha256 + BaseSerializer) verify           529,042 ops/s

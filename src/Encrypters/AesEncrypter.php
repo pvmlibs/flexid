@@ -19,7 +19,8 @@ use Pvmlibs\FlexId\Exceptions\IdEncodeException;
  * Notes:
  * - for the same data (input id, additionalData, secret) produces the same output
  * - includes authentication (64-bit) to utilize 128-bit block space - with MAC-then-encrypt
- *   approach so authentication is done after decrypting.
+ *      approach so authentication is done after decrypting.
+ * - first use has ~1ms additional latency for AES preparation.
  */
 class AesEncrypter implements EncrypterContract
 {
@@ -94,7 +95,7 @@ class AesEncrypter implements EncrypterContract
             }
             $this->maxOutputChars = $this->serializer->getMaxEncodedLength() * 2;
         } else {
-            $this->maxOutputChars = 32; // hex, 16 bytes
+            $this->maxOutputChars = 32; // hex, 16*2 bytes
         }
     }
 
