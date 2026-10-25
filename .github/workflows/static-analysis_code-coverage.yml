@@ -40,12 +40,6 @@ jobs:
           extensions: redis, pcntl, apcu, bcmath, openssl
           ini-values: apc.enabled=1, apc.enable_cli=1
 
-      - name: Install flexid_utils
-        run: |
-          ext_dir="$HOME/.php/extensions"
-          mkdir -p "$ext_dir"
-          curl -fsSL "https://github.com/pvmlibs/flexid_utils/releases/download/1.0.8/php_flexid_utils-1.0.8_php8.1-x86_64-linux-glibc-nts.tgz" | tar -xz -C "$ext_dir"
-
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
@@ -53,7 +47,9 @@ jobs:
         run: php -d memory_limit=400M vendor/bin/phpstan
 
       - name: Code coverage
-        run: php -d extension="$ext_dir"/flexid_utils.so vendor/bin/phpunit --coverage-clover=coverage.xml
+        run: |
+          curl -fsSL "https://github.com/pvmlibs/flexid_utils/releases/download/1.0.8/php_flexid_utils-1.0.8_php8.1-x86_64-linux-glibc-nts.tgz" | tar -xz -C .
+          php -d extension=./flexid_utils.so vendor/bin/phpunit --coverage-clover=coverage.xml
         env:
           TESTING_REDIS_HOST: localhost
           TESTING_REDIS_PORT: 6379
