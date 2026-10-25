@@ -8,10 +8,12 @@ use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Exceptions\IdBadSignException;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\FlexIdGenerator;
+use Pvmlibs\FlexId\HMAC\Sha256HMAC;
 use Pvmlibs\FlexId\IdHandlers\EncodedId;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
+use Pvmlibs\FlexId\Tools\KeyGen;
 use Tests\Internal\TestingWorkerResolver;
 
 /**
@@ -26,7 +28,9 @@ final class IdEncodedTest extends TestCase
         $workerResolver = new TestingWorkerResolver();
         $workerResolver->setWorker(fn () => 1);
         $serializer = new CustomSerializer();
-        $signer = new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer());
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $signer = new Signer(new BaseSerializer(), $hmac);
 
         $encodedId = new EncodedId(
             serializer: $serializer,

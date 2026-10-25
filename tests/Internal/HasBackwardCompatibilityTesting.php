@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Internal;
 
+use function file_put_contents;
+
 trait HasBackwardCompatibilityTesting
 {
     /**
@@ -11,6 +13,10 @@ trait HasBackwardCompatibilityTesting
      */
     private function validateBackwardCompatibility(\Closure $feed, int $minRange, int $maxRange, string $name): void
     {
+        if ($minRange >= $maxRange) {
+            $this::fail('min range is larger than the max range');
+        }
+
         $incrementHash = hash_init('sha256');
 
         // sequential

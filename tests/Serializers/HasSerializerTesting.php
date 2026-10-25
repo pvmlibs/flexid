@@ -132,8 +132,55 @@ trait HasSerializerTesting
         try {
             // id too long
             $serializer->deserialize($serializer->serialize($maxRange) . $alphabet[0]);
-            $this::fail("Id should be out of range, alphabet {$alphabet}");
+            $this::fail("Id should be out of range, alphabet {$alphabet} {$maxRange} " . $serializer->serialize($maxRange) . $alphabet[0]);
         } catch (IdDecodeException $e) {
         }
+        try {
+            // id within length but out of range
+            if (\strlen($alphabet) > 2) {
+                $serializer->deserialize(\str_repeat(\substr($alphabet, 1), $serializer->getMaxEncodedLength()));
+                $this::fail("Id should be out of range, alphabet {$alphabet}");
+            }
+        } catch (IdDecodeException $e) {
+        }
+    }
+
+    private function runDeterministicBatch(SerializerContract $serializer, bool $positivesOnly = false): string
+    {
+        $incrementHash = \hash_init('sha3-512');
+
+        // linear
+        for ($id = 1; $id < 500; $id++) {
+            \hash_update($incrementHash, $serializer->serialize($id));
+            \hash_update($incrementHash, $serializer->serialize(PHP_INT_MAX - $id));
+        }
+
+        // test random id for rest int range range
+        $step = intdiv(PHP_INT_MAX, 500);
+        for ($id = 500; $id < PHP_INT_MAX - 500; $id += $step) {
+            \hash_update($incrementHash, $serializer->serialize($id));
+        }
+
+        // corner cases
+        \hash_update($incrementHash, $serializer->serialize(PHP_INT_MAX));
+        \hash_update($incrementHash, $serializer->serialize(0));
+
+        if ($positivesOnly === false) {
+            // linear
+            for ($id = 1; $id < 500; $id++) {
+                \hash_update($incrementHash, $serializer->serialize(-$id));
+                \hash_update($incrementHash, $serializer->serialize(PHP_INT_MIN + $id));
+            }
+
+            // test random id for rest int range range
+            $step = intdiv(PHP_INT_MAX, 500);
+            for ($id = 500; $id < PHP_INT_MAX - 500; $id += $step) {
+                \hash_update($incrementHash, $serializer->serialize(-$id));
+            }
+
+            \hash_update($incrementHash, $serializer->serialize(PHP_INT_MIN));
+        }
+
+        return \hash_final($incrementHash);
     }
 }

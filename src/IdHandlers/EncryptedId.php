@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pvmlibs\FlexId\IdHandlers;
 
 use Pvmlibs\FlexId\Contracts\EncrypterContract;
+use Pvmlibs\FlexId\Contracts\EncrypterWithMacContract;
 use Pvmlibs\FlexId\Contracts\IdGeneratorContract;
 use Pvmlibs\FlexId\Contracts\IdHandlerContract;
 use Pvmlibs\FlexId\Contracts\SignerContract;
@@ -15,7 +16,7 @@ class EncryptedId implements IdHandlerContract
     private int $maxIdLength;
 
     public function __construct(
-        private EncrypterContract $encrypter,
+        private EncrypterContract|EncrypterWithMacContract $encrypter,
         private ?SignerContract $signer = null,
         private ?IdGeneratorContract $generator = null,
     ) {
@@ -33,7 +34,12 @@ class EncryptedId implements IdHandlerContract
 
     public function toPublicId(int $id, string $additionalData = ''): string
     {
-        $encrypted = $this->encrypter->encrypt($id, $additionalData);
+        if ($this->encrypter instanceof EncrypterContract) {
+            $encrypted = $this->encrypter->encrypt($id);
+        } else {
+            $encrypted = $this->encrypter->encrypt($id, $additionalData);
+        }
+
         if ($this->signer !== null) {
             return $this->signer->getSignedId($encrypted, $additionalData);
         }
@@ -51,6 +57,11 @@ class EncryptedId implements IdHandlerContract
             $publicId = $this->signer->getIdFromSigned($publicId, $additionalData);
         }
 
+        if ($this->encrypter instanceof EncrypterContract) {
+            return $this->encrypter->decrypt($publicId);
+        }
+
         return $this->encrypter->decrypt($publicId, $additionalData);
+
     }
 }

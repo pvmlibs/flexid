@@ -115,7 +115,7 @@ class IdStats
                 try {
                     $id = $generator->idInTime((int) (\microtime(true) * 1_000_000) + $yearMicroseconds);
                     $encoded = $this->serializer?->serialize($id);
-                    $encrypted = $this->encrypter?->encrypt($id, '');
+                    $encrypted = $this->encrypter?->encrypt($id);
                 } catch (IdGeneratorException) {
                     $id = 'time range exhausted';
                     $encoded = null;
@@ -153,7 +153,7 @@ class IdStats
         }
 
         if ($this->encrypter !== null) {
-            $results['encrypter current id length'] = \strlen($this->encrypter->encrypt($testId, ''));
+            $results['encrypter current id length'] = \strlen($this->encrypter->encrypt($testId));
         }
 
         return $results;
@@ -213,11 +213,11 @@ class IdStats
         }
 
         if ($this->encrypter !== null) {
-            $encrypted = $this->encrypter->encrypt($testId, '');
+            $encrypted = $this->encrypter->encrypt($testId);
 
             $start = \hrtime(true);
             for ($i = 0; $i < $total; $i++) {
-                $this->encrypter->encrypt($testId, '');
+                $this->encrypter->encrypt($testId);
             }
             $end = \hrtime(true);
             $results['perf']['id encrypt'] = \round($total / ($end - $start) * 1e9);
@@ -283,10 +283,6 @@ class IdStats
                 end($class),
                 $this->serializer->getAlphabet(),
             );
-        }
-
-        if ($this->encrypter !== null) {
-            $encrypterClass = explode('\\', $this->encrypter::class);
         }
 
         if ($info) {

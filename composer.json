@@ -21,7 +21,8 @@
   ],
   "minimum-stability": "stable",
   "require": {
-    "php-64bit": ">=8.1"
+    "php": "^8.1",
+    "php-64bit": "*"
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3.84",
@@ -49,11 +50,12 @@
   "suggest": {
     "ext-redis": "Faster Redis/Valkey communication",
     "ext-apcu": "Enables APCu worker resolver",
-    "ext-bcmath": "Enables slightly shorter output from encrypters and signer using CustomSerializer",
-    "ext-gmp": "Enables slightly shorter output from encrypters and signer using CustomSerializer",
+    "ext-bcmath": "Enables CustomSerializer working in full range (e.g. for encrypters)",
+    "ext-gmp": "Enables CustomSerializer working in full range (e.g. for encrypters)",
     "ext-sodium": "Enables fast SipHash algorithm for signing id and XChaCha20Encrypter",
     "ext-mbstring": "Enables alphabet validation against multibyte characters",
-    "ext-openssl": "Enables AesEncrypter"
+    "ext-openssl": "Enables AesEncrypter",
+    "ext-flexid_utils": "Much faster processing of serializers, Sparx encrypters and optimized siphash-2-4, blake3"
   },
   "scripts": {
     "check": [

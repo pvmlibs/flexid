@@ -8,11 +8,15 @@ use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Exceptions\IdBadSignException;
 use Pvmlibs\FlexId\Exceptions\IdSigningException;
 use Pvmlibs\FlexId\Exceptions\IdVerifySignException;
+use Pvmlibs\FlexId\HMAC\Blake2HMACSodiumExt;
+use Pvmlibs\FlexId\HMAC\Sha256HMAC;
+use Pvmlibs\FlexId\HMAC\SiphashHMAC;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Serializers\HexSerializer;
 use Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersBCMath;
 use Pvmlibs\FlexId\Signers\Signer;
+use Pvmlibs\FlexId\Tools\KeyGen;
 use Tests\Internal\HasBackwardCompatibilityTesting;
 use Tests\Internal\HasCharDistributionTesting;
 
@@ -27,68 +31,57 @@ final class SignerTest extends TestCase
 
     public function testWithSodiumSipHash(): void
     {
-        $key = Signer::generateSecret();
+        $key = KeyGen::generate();
+        $hmac = new SiphashHMAC($key);
         $signer = new Signer(
-            secret: $key,
             serializer: new BaseSerializer(),
-            hashAlgo: 'siphash-2-4',
+            hmac: $hmac,
         );
         $this->validateSignAndVerify($signer);
     }
 
     public function testWithSodiumBlake(): void
     {
-        $key = Signer::generateSecret();
+        $key = KeyGen::generate();
+        $hmac = new Blake2HMACSodiumExt($key);
         $signer = new Signer(
-            secret: $key,
             serializer: new BaseSerializer(),
-            hashAlgo: 'blake2b',
+            hmac: $hmac,
         );
         $this->validateSignAndVerify($signer);
     }
 
     public function testWithHashHmacSha256(): void
     {
-        $key = Signer::generateSecret();
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
         $signer = new Signer(
-            secret: $key,
             serializer: new CustomSerializer(new FullRangeIntegersBCMath()),
-            hashAlgo: 'sha256',
+            hmac: $hmac,
         );
         $this->validateSignAndVerify($signer);
     }
 
-    public function testWithNonCryptographyHash(): void
-    {
-        $key = Signer::generateSecret();
-        $this::expectException(\InvalidArgumentException::class);
-        new Signer(
-            secret: $key,
-            serializer: new CustomSerializer(),
-            hashAlgo: 'xxh64',
-        );
-    }
-
     public function testWithHexSerializer(): void
     {
-        $key = Signer::generateSecret();
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
         $signer = new Signer(
-            secret: $key,
             serializer: new HexSerializer(),
-            hashAlgo: 'siphash-2-4',
+            hmac: $hmac,
         );
         $this->validateSignAndVerify($signer);
     }
 
     public function testWithVariableSignLength(): void
     {
-        $key = Signer::generateSecret();
+        $key = KeyGen::generate();
+        $hmac = new SiphashHMAC($key);
         $baseSerializer = new BaseSerializer();
         for ($i = 1; $i <= $baseSerializer->getMaxEncodedLength(); $i++) {
             $signer = new Signer(
-                secret: $key,
                 serializer: $baseSerializer,
-                hashAlgo: 'siphash-2-4',
+                hmac: $hmac,
                 maxSignLength: $i,
             );
             $this->validateSignAndVerify($signer, 1000);
@@ -100,9 +93,8 @@ final class SignerTest extends TestCase
         // check for 63 bits
         for ($i = 1; $i <= $customSerializer->getMaxEncodedLength(); $i++) {
             $signer = new Signer(
-                secret: $key,
                 serializer: $customSerializer,
-                hashAlgo: 'siphash-2-4',
+                hmac: $hmac,
                 maxSignLength: $i,
                 onlyPositiveRange: true,
             );
@@ -113,9 +105,8 @@ final class SignerTest extends TestCase
         }
 
         $signer = new Signer(
-            secret: $key,
             serializer: $baseSerializer,
-            hashAlgo: 'siphash-2-4',
+            hmac: $hmac,
             maxSignLength: 1,
         );
         $id = 'abcdefgh';
@@ -124,23 +115,23 @@ final class SignerTest extends TestCase
 
         $this::expectException(\InvalidArgumentException::class);
         new Signer(
-            secret: $key,
             serializer: $baseSerializer,
-            hashAlgo: 'siphash-2-4',
+            hmac: $hmac,
             maxSignLength: $baseSerializer->getMaxEncodedLength() + 1,
         );
     }
 
     public function testWithExtendedSignBits(): void
     {
-        $key = Signer::generateSecret();
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
         $bits = [128, 192, 256];
         $serializer = new BaseSerializer();
         foreach ($bits as $bitSize) {
             for ($i = 1; $i <= $serializer->getMaxEncodedLength(); $i++) {
                 $signer = new Signer(
-                    secret: $key,
                     serializer: new BaseSerializer(),
+                    hmac: $hmac,
                     maxSignLength: $i,
                     signBits: $bitSize,
                 );
@@ -155,8 +146,8 @@ final class SignerTest extends TestCase
         foreach ($bits as $bitSize) {
             for ($i = 1; $i <= $serializer->getMaxEncodedLength(); $i++) {
                 $signer = new Signer(
-                    secret: $key,
                     serializer: new CustomSerializer(),
+                    hmac: $hmac,
                     maxSignLength: $i,
                     signBits: $bitSize,
                     onlyPositiveRange: true,
@@ -169,9 +160,8 @@ final class SignerTest extends TestCase
         }
         $this::expectException(\InvalidArgumentException::class);
         new Signer(
-            secret: $key,
             serializer: $serializer,
-            hashAlgo: 'siphash-2-4',
+            hmac: $hmac,
             signBits: 123,
         );
     }
@@ -180,9 +170,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
-            hashAlgo: 'siphash-2-4',
+            hmac: new SiphashHMAC(KeyGen::generate()),
             signBits: 128,
         );
     }
@@ -190,9 +179,8 @@ final class SignerTest extends TestCase
     public function testReducedBitsHash(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new CustomSerializer(),
-            hashAlgo: 'siphash-2-4',
+            hmac: new SiphashHMAC(KeyGen::generate()),
             onlyPositiveRange: true,
         );
         $this->validateSignAndVerify($signer, 1000);
@@ -201,8 +189,8 @@ final class SignerTest extends TestCase
     public function testVerifyBadId(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $this->expectException(IdVerifySignException::class);
         $signer->getIdFromSigned('ghry*');
@@ -211,8 +199,8 @@ final class SignerTest extends TestCase
     public function testVerifyBadIdNulls(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $this->expectException(IdBadSignException::class);
         $signer->getIdFromSigned(str_repeat("\x00", 16));
@@ -221,8 +209,8 @@ final class SignerTest extends TestCase
     public function testSignEmptyId(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $this->expectException(IdSigningException::class);
         $signer->getSignedId('');
@@ -231,8 +219,8 @@ final class SignerTest extends TestCase
     public function testGetIdFromEmptyData(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $this->expectException(IdVerifySignException::class);
         $signer->getIdFromSigned('');
@@ -241,8 +229,8 @@ final class SignerTest extends TestCase
     public function testGetIdFromTooLongData(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $this->expectException(IdBadSignException::class);
         $signer->getIdFromSigned('djclaorhfncajkdths83jdneqm06ns84ae');
@@ -251,8 +239,8 @@ final class SignerTest extends TestCase
     public function testTamperWithId(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $id = 'sdflk4sfk';
         $signed = $signer->getSignedId($id);
@@ -266,8 +254,8 @@ final class SignerTest extends TestCase
     public function testTamperWithSign(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $id = 'sdflk4sfk';
         $signed = $signer->getSignedId($id);
@@ -281,16 +269,16 @@ final class SignerTest extends TestCase
     public function testSignDifferentKeys(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $id = 'sdflk4sfk';
         $signed = $signer->getSignedId($id);
         $this::assertSame($id, $signer->getIdFromSigned($signed));
 
         $signer2 = new Signer(
-            secret: 'rCl29//aZ51LjLQZKUbMUA==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
         $signed2 = $signer2->getSignedId($id);
         $this::assertNotSame($signed, $signed2);
@@ -303,8 +291,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
             separator: '-_',
         );
     }
@@ -313,8 +301,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new CustomSerializer(fullRangeIntegerOperations: new FullRangeIntegersBCMath(), alphabet: 'absj-'),
+            hmac: new SiphashHMAC(KeyGen::generate()),
             separator: '-',
         );
     }
@@ -323,8 +311,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWB',
             serializer: new CustomSerializer(fullRangeIntegerOperations: new FullRangeIntegersBCMath(), alphabet: 'absj-'),
+            hmac: new SiphashHMAC(KeyGen::generate()),
             separator: '-',
         );
     }
@@ -333,8 +321,8 @@ final class SignerTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new CustomSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
             separator: '-',
             maxSignLength: 0,
         );
@@ -343,8 +331,8 @@ final class SignerTest extends TestCase
     public function testEvenCharsDistribution(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new HexSerializer(),
+            hmac: new SiphashHMAC(KeyGen::generate()),
         );
 
         $total = 1000;
@@ -373,8 +361,8 @@ final class SignerTest extends TestCase
     public function testBackwardCompatibility(): void
     {
         $signer = new Signer(
-            secret: 'PsQBSNyMoz60RpQnSKWBMg==',
             serializer: new BaseSerializer(),
+            hmac: new SiphashHMAC('PsQBSNyMoz60RpQnSKWBMg=='),
         );
         $this->validateBackwardCompatibility(fn (int $id): string => $signer->getSignedId((string) $id), 0, PHP_INT_MAX, 'Signer');
         $this->validateBackwardCompatibility(fn (int $id): string => $signer->getSignedId((string) $id, 'abcd'), 0, PHP_INT_MAX, 'SignerAD');

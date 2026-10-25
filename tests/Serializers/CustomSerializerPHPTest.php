@@ -7,7 +7,7 @@ namespace Tests\Serializers;
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
-use Pvmlibs\FlexId\Serializers\CustomSerializer;
+use Pvmlibs\FlexId\Serializers\Implementations\CustomSerializerPHP;
 use Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersBCMath;
 use Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersGmp;
 use Tests\Internal\HasBackwardCompatibilityTesting;
@@ -16,7 +16,7 @@ use Tests\Internal\HasCharDistributionTesting;
 /**
  * @internal
  */
-final class CustomSerializerTest extends TestCase
+final class CustomSerializerPHPTest extends TestCase
 {
     use HasSerializerTesting;
     use HasBackwardCompatibilityTesting;
@@ -24,11 +24,11 @@ final class CustomSerializerTest extends TestCase
 
     public function testSerializeDeserializeWithPositives(): void
     {
-        $serializer = new CustomSerializer(null);
+        $serializer = new CustomSerializerPHP(null);
         $this->validateSerializeDeserialize($serializer, true);
 
         foreach ($this->alphabets() as $alphabet) {
-            $serializer = new CustomSerializer(alphabet: $alphabet);
+            $serializer = new CustomSerializerPHP(alphabet: $alphabet);
             $this->validateSerializeDeserialize(serializer: $serializer, positivesOnly: true, incrementalRange: 100);
 
             $this->validateOutOfRange($alphabet, $serializer, PHP_INT_MAX);
@@ -40,20 +40,20 @@ final class CustomSerializerTest extends TestCase
 
     public function testSerializeDeserializeFullRange(): void
     {
-        $serializer = new CustomSerializer(fullRangeIntegerOperations: new FullRangeIntegersBCMath());
+        $serializer = new CustomSerializerPHP(fullRangeIntegerOperations: new FullRangeIntegersBCMath());
         $this->validateSerializeDeserialize($serializer);
         $bcmathHash = $this->validateSerializeDeserialize($serializer, false, false);
 
-        $serializer = new CustomSerializer(fullRangeIntegerOperations: new FullRangeIntegersGmp());
+        $serializer = new CustomSerializerPHP(fullRangeIntegerOperations: new FullRangeIntegersGmp());
         $this->validateSerializeDeserialize($serializer);
         $gmpHash = $this->validateSerializeDeserialize($serializer, false, false);
         $this::assertSame($bcmathHash, $gmpHash, 'BCMath and GMP are not interoperable');
 
         foreach ($this->alphabets() as $alphabet) {
-            $serializer = new CustomSerializer(new FullRangeIntegersBCMath(), $alphabet);
+            $serializer = new CustomSerializerPHP(new FullRangeIntegersBCMath(), $alphabet);
             $this->validateSerializeDeserialize(serializer: $serializer, incrementalRange: 100);
 
-            $serializer = new CustomSerializer(new FullRangeIntegersGmp(), $alphabet);
+            $serializer = new CustomSerializerPHP(new FullRangeIntegersGmp(), $alphabet);
             $this->validateSerializeDeserialize(serializer: $serializer, incrementalRange: 100);
 
             $this->validateOutOfRange($alphabet, $serializer, -1);
@@ -62,7 +62,7 @@ final class CustomSerializerTest extends TestCase
 
     public function testSerializeDeserializeWithPositivesShortAlphabet(): void
     {
-        $serializer = new CustomSerializer(null, 'ab');
+        $serializer = new CustomSerializerPHP(null, 'ab');
         $this->validateSerializeDeserialize($serializer, true);
 
         $this::expectException(IdEncodeException::class);
@@ -72,20 +72,20 @@ final class CustomSerializerTest extends TestCase
     public function testSerializeDeserializeFullRangeDifferentAlphabets(): void
     {
         foreach ($this->alphabets() as $alphabet) {
-            $serializer = new CustomSerializer(new FullRangeIntegersBCMath(), $alphabet);
+            $serializer = new CustomSerializerPHP(new FullRangeIntegersBCMath(), $alphabet);
             $this->validateSerializeDeserialize(serializer: $serializer, incrementalRange: 1000);
 
-            $serializer = new CustomSerializer(new FullRangeIntegersGmp(), $alphabet);
+            $serializer = new CustomSerializerPHP(new FullRangeIntegersGmp(), $alphabet);
             $this->validateSerializeDeserialize(serializer: $serializer, incrementalRange: 1000);
         }
     }
 
     public function testDeserializeNegativeWithPositive(): void
     {
-        $serializer = new CustomSerializer(new FullRangeIntegersGmp());
+        $serializer = new CustomSerializerPHP(new FullRangeIntegersGmp());
         $serialized = $serializer->serialize(-1);
 
-        $serializerPositives = new CustomSerializer();
+        $serializerPositives = new CustomSerializerPHP();
         $this::expectException(IdDecodeException::class);
         $serializerPositives->deserialize($serialized);
     }
@@ -93,63 +93,63 @@ final class CustomSerializerTest extends TestCase
     public function testEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new CustomSerializer(alphabet: '');
+        new CustomSerializerPHP(alphabet: '');
     }
 
     public function testTooSmallAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new CustomSerializer(alphabet: 's');
+        new CustomSerializerPHP(alphabet: 's');
     }
 
     public function testNotUniqueAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new CustomSerializer(alphabet: 'ssd');
+        new CustomSerializerPHP(alphabet: 'ssd');
     }
 
     public function testAlphabetContainsMultibyteChars(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new CustomSerializer(alphabet: 'sbâ');
+        new CustomSerializerPHP(alphabet: 'sbâ');
     }
 
     public function testEmptyId(): void
     {
-        $serializer = new CustomSerializer();
+        $serializer = new CustomSerializerPHP();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('');
     }
 
     public function testBadCharactersInId(): void
     {
-        $serializer = new CustomSerializer();
+        $serializer = new CustomSerializerPHP();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('-');
     }
 
     public function testBadCharactersInIdMiddle(): void
     {
-        $serializer = new CustomSerializer();
+        $serializer = new CustomSerializerPHP();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('Db-Db');
     }
 
     public function testBackwardCompatibilityPositives(): void
     {
-        $serializer = new CustomSerializer();
+        $serializer = new CustomSerializerPHP();
         $this->validateBackwardCompatibility(fn (int $id): string => $serializer->serialize($id), 0, PHP_INT_MAX, 'CustomAlphabetSerializer_Positives');
     }
 
     public function testBackwardCompatibilitBcMath(): void
     {
-        $serializer = new CustomSerializer(new FullRangeIntegersBCMath());
+        $serializer = new CustomSerializerPHP(new FullRangeIntegersBCMath());
         $this->validateBackwardCompatibility(fn (int $id): string => $serializer->serialize($id), PHP_INT_MIN, PHP_INT_MAX, 'CustomAlphabetSerializer_BCmath');
     }
 
     public function testBackwardCompatibilitGmp(): void
     {
-        $serializer = new CustomSerializer(new FullRangeIntegersGmp());
+        $serializer = new CustomSerializerPHP(new FullRangeIntegersGmp());
         $this->validateBackwardCompatibility(fn (int $id): string => $serializer->serialize($id), PHP_INT_MIN, PHP_INT_MAX, 'CustomAlphabetSerializer_Gmp');
     }
 }

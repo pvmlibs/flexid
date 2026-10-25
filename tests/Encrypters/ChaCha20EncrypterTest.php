@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Encrypters;
+namespace Tests\Encrypters;
 
 use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Encrypters\XChaCha20Encrypter;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdDecryptException;
-use Tests\Encrypters\HasEncrypterTesting;
+use Pvmlibs\FlexId\Tools\KeyGen;
 use Tests\Internal\HasBackwardCompatibilityTesting;
 use Tests\Internal\HasCharDistributionTesting;
 
@@ -33,13 +33,13 @@ final class ChaCha20EncrypterTest extends TestCase
 
     private function runBatchForEncoding(bool $useBase64): void
     {
-        $secret = XChaCha20Encrypter::generateSecret();
+        $secret = KeyGen::generate();
 
-        $encrypter = new XChaCha20Encrypter(secret: $secret, base64Encode: $useBase64);
+        $encrypter = new XChaCha20Encrypter(base64secret: $secret, base64Encode: $useBase64);
         $encrypted = [];
-        $this->runBatch($encrypter, $encrypted);
+        $this->runBatchWithAd($encrypter, $encrypted);
         $ad = \random_bytes(8);
-        $expected = $this->runBatch($encrypter, $encrypted, $ad);
+        $expected = $this->runBatchWithAd($encrypter, $encrypted, $ad);
         $this::assertCount($expected, $encrypted, 'There are duplicates');
 
         $encryptedNoAD = $encrypter->encrypt(100);
@@ -64,21 +64,21 @@ final class ChaCha20EncrypterTest extends TestCase
 
     public function testTooLongCiphertextDecrypt(): void
     {
-        $encrypter = new XChaCha20Encrypter(XChaCha20Encrypter::generateSecret());
+        $encrypter = new XChaCha20Encrypter(KeyGen::generate());
         $this::expectException(IdDecodeException::class);
         $encrypter->decrypt('rdjdhfger9jfdglksdf34rlkmsdfpwjfsrdjdhfger9jfdglksdf34rlkmsdfpwjfs');
     }
 
     public function testEmptyCiphertextDecrypt(): void
     {
-        $encrypter = new XChaCha20Encrypter(XChaCha20Encrypter::generateSecret());
+        $encrypter = new XChaCha20Encrypter(KeyGen::generate());
         $this::expectException(IdDecodeException::class);
         $encrypter->decrypt('');
     }
 
     public function testRandomCiphertextDecrypt(): void
     {
-        $encrypter = new XChaCha20Encrypter(XChaCha20Encrypter::generateSecret());
+        $encrypter = new XChaCha20Encrypter(KeyGen::generate());
         $counter = 0;
         for ($i = 0; $i < 1000; $i++) {
             try {
@@ -92,7 +92,7 @@ final class ChaCha20EncrypterTest extends TestCase
 
     public function testSameIdDifferentOutput(): void
     {
-        $encrypter = new XChaCha20Encrypter(XChaCha20Encrypter::generateSecret());
+        $encrypter = new XChaCha20Encrypter(KeyGen::generate());
         $ids = [];
         for ($i = 0; $i < 500; $i++) {
             $ids[] = $encrypter->encrypt(1);
@@ -105,7 +105,7 @@ final class ChaCha20EncrypterTest extends TestCase
         $counter = 0;
         for ($i = 0; $i < 1000; $i++) {
             try {
-                $key = XChaCha20Encrypter::generateSecret();
+                $key = KeyGen::generate();
                 $encrypter = new XChaCha20Encrypter($key);
                 $ciphertext = $encrypter->encrypt($i);
                 $ciphertextAltered = str_shuffle($ciphertext);
@@ -124,13 +124,13 @@ final class ChaCha20EncrypterTest extends TestCase
     public function testWrongSecret(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new XChaCha20Encrypter(secret: 'asfdsd');
+        new XChaCha20Encrypter(base64secret: 'asfdsd');
     }
 
     public function testEvenCharsDistributionBase64(): void
     {
-        $secret = XChaCha20Encrypter::generateSecret();
-        $encrypter = new XChaCha20Encrypter(secret: $secret, base64Encode: true);
+        $secret = KeyGen::generate();
+        $encrypter = new XChaCha20Encrypter(base64secret: $secret, base64Encode: true);
 
         $total = 1000;
         $ids = new \SplFixedArray($total);
@@ -144,8 +144,8 @@ final class ChaCha20EncrypterTest extends TestCase
 
     public function testEvenCharsDistributionHex(): void
     {
-        $secret = XChaCha20Encrypter::generateSecret();
-        $encrypter = new XChaCha20Encrypter(secret: $secret, base64Encode: false);
+        $secret = KeyGen::generate();
+        $encrypter = new XChaCha20Encrypter(base64secret: $secret, base64Encode: false);
 
         $total = 1000;
         $ids = new \SplFixedArray($total);

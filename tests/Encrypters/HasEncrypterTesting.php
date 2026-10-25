@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Tests\Encrypters;
 
 use Pvmlibs\FlexId\Contracts\EncrypterContract;
+use Pvmlibs\FlexId\Contracts\EncrypterWithMacContract;
 
 trait HasEncrypterTesting
 {
     /**
      * @param array<string> $encryptedIds
      */
-    private function runBatch(EncrypterContract $encrypter, array &$encryptedIds, string $ad = ''): int
+    private function runBatchWithAd(EncrypterWithMacContract $encrypter, array &$encryptedIds, string $ad = ''): int
     {
         // merging with existing array
         $expected = count($encryptedIds);
@@ -20,7 +21,7 @@ trait HasEncrypterTesting
         $incrementHashToEncrypt = \hash_init('sha3-512');
 
         // linear
-        for ($i = 1; $i < 10; $i++) {
+        for ($i = 1; $i < 1000; $i += 10) {
             $idEncrypted = $encrypter->encrypt($i, $ad);
             $encryptedIds[$idEncrypted] = $idEncrypted;
             $expected++;
@@ -80,4 +81,75 @@ trait HasEncrypterTesting
         return $expected;
     }
 
+    /**
+     * @param array<string> $encryptedIds
+     */
+    private function runBatch(EncrypterContract $encrypter, array &$encryptedIds): int
+    {
+        // merging with existing array
+        $expected = count($encryptedIds);
+
+        $incrementHashDecrypted = \hash_init('sha3-512');
+        $incrementHashToEncrypt = \hash_init('sha3-512');
+
+        // linear
+        for ($i = 1; $i < 10; $i++) {
+            $idEncrypted = $encrypter->encrypt($i);
+            $encryptedIds[$idEncrypted] = $idEncrypted;
+            $expected++;
+            \hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($idEncrypted));
+            \hash_update($incrementHashToEncrypt, (string) $i);
+
+            // negatives
+            $idEncrypted = $encrypter->encrypt(-$i);
+            $encryptedIds[$idEncrypted] = $idEncrypted;
+
+            $expected++;
+            \hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($idEncrypted));
+            \hash_update($incrementHashToEncrypt, (string) -$i);
+        }
+
+        // test random id for rest int range range
+        for ($i = 0; $i < 5000; $i++) {
+            $id = \random_int(1001, PHP_INT_MAX - 1);
+            $idEncrypted = $encrypter->encrypt($id);
+            $encryptedIds[$idEncrypted] = $idEncrypted;
+            $expected++;
+
+            \hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($idEncrypted));
+            \hash_update($incrementHashToEncrypt, (string) $id);
+
+            // negatives
+            $idEncrypted = $encrypter->encrypt(-$id);
+            $encryptedIds[$idEncrypted] = $idEncrypted;
+
+            $expected++;
+            \hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($idEncrypted));
+            \hash_update($incrementHashToEncrypt, (string) -$id);
+        }
+
+        // corner cases
+        $encrypted = $encrypter->encrypt(PHP_INT_MAX);
+        $encryptedIds[$encrypted] = $encrypted;
+        $expected++;
+        \hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($encrypted));
+        \hash_update($incrementHashToEncrypt, (string) PHP_INT_MAX);
+
+        $encrypted = $encrypter->encrypt(PHP_INT_MIN);
+        $encryptedIds[$encrypted] = $encrypted;
+        $expected++;
+        \hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($encrypted));
+        \hash_update($incrementHashToEncrypt, (string) PHP_INT_MIN);
+
+        $encrypted = $encrypter->encrypt(0);
+        $encryptedIds[$encrypted] = $encrypted;
+        $expected++;
+        \hash_update($incrementHashDecrypted, (string) $encrypter->decrypt($encrypted));
+        \hash_update($incrementHashToEncrypt, '0');
+
+        $this::assertSame(\hash_final($incrementHashDecrypted), \hash_final($incrementHashToEncrypt));
+        $this::assertSame($expected, count($encryptedIds), 'There are duplicates');
+
+        return $expected;
+    }
 }

@@ -302,11 +302,11 @@ class FlexIdGenerator implements IdGeneratorContract
             break;
         }
 
-        if ($workerId === null && $exception !== null) {
+        if ($workerId === null) {
             throw new NoWorkerAvailableException($exception->maxWorkers, $exception->groupId, $lockTimeUs);
         }
 
-        if ($workerId >= $this->resolverIdConfiguration->maxWorkers || $workerId < 0 || $workerId === null) {
+        if ($workerId >= $this->resolverIdConfiguration->maxWorkers || $workerId < 0) {
             throw new IdGeneratorException(\sprintf('Worker resolver return id %d out of range 0-%d', $workerId, $this->resolverIdConfiguration->maxWorkers - 1));
         }
 

@@ -9,23 +9,21 @@ ID Value Objects also assure assigning correct id type in models and are helpful
 1. Prepare id.php config file
 ```php
 return [
-    'encryption_key' => env('ID_ENCRYPTION_KEY'), // generate appropriate key, e.g. Sparx64Encrypter::generateSecret()
-    'signing_key' => env('ID_SIGNING_KEY'), // generate appropriate key, e.g. Signer::generateKey();
+    'secret_key' => env('ID_SECRET_KEY'), // generate KeyGen::generate(), can be used for encryption and signing
     'alphabet' => env('ID_ALPHABET'), // shuffled alphabet, especially important when encoding with HashSerializer
 ]
 ```
 
 2. Create base class for id handling. It should be one per id handling method, e.g. encryption, encoding or e.g. different handling
 for autoincrement id and timestamp based id.
+
 ```php
 use Illuminate\Contracts\Database\Eloquent\Castable;
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
 use Pvmlibs\FlexId\Concerns\HasIdHandler;
-use Pvmlibs\FlexId\Contracts\IdHandlerContract;
 use Pvmlibs\FlexId\IdHandlers\EncryptedId;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
-use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
 use Pvmlibs\FlexId\Signers\Signer;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -42,24 +40,29 @@ abstract class EncryptedIdAbstract implements Castable, \JsonSerializable
 //            new EncodedId(
 //                new HashSerializer(alphabet: config('id.alphabet'), minLength: 4),
 //                new Signer(
-//                    secret: config('id.signing_key'),
 //                    serializer: new CustomSerializer(),
-//                    hashAlgo: 'sha256', // use siphash-2-4 for better performance when sodium extension is available
+//                    hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC(config('id.secret_key')), // use SiphashHMAC for better performance
 //                    maxSignLength: 4,
 //                    onlyPositiveRange: true,
 //                ),
 //                null, // here you can optionally pass IdGeneratorContract if you want to generate id from app
 //            ),            
-            // example for encrypted and signed id (64 bit) for better confidentiality (but longer output, here ~26 chars)
+            // example for encrypted (64-bit block, 128-bit key) and signed id (64-bit) for better confidentiality (but longer output, here ~26 chars)
             new EncryptedId(
-                new Sparx64Encrypter(config('id.encryption_key'), new BaseSerializer()),
-                new Signer( // optional but recommended
-                    config('id.signing_key'),
-                    new BaseSerializer(),
-                    'sha256', // use siphash-2-4 for better performance when sodium extension is available
+                new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(config('id.secret_key'), new BaseSerializer()),
+                new Signer( // optional but recommended, we can use the same key, sign will use hkdf key derivation
+                    serializer: new BaseSerializer(),
+                    hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC(config('id.secret_key')) // use SiphashHMAC for better performance
                 ),
                 null, // here you can optionally pass IdGeneratorContract if you want to generate id from app
             ),
+            // example for encryption (128-bit block, 256-bit key) with build-in sign (64 bit) (~26 chars)
+            // use Sparx128TurboEncrypter if possible
+            new EncryptedId(
+                new \Pvmlibs\FlexId\Encrypters\Sparx128Encrypter(config('id.secret_key'), new BaseSerializer()),
+                null, // id have already a sign, but you can add additional sign
+                null, // here you can optionally pass IdGeneratorContract if you want to generate id from app
+            ),            
         ];
         return $class;
     }

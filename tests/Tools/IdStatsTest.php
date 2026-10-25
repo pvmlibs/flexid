@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Tests\Tools;
 
 use PHPUnit\Framework\TestCase;
+use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
 use Pvmlibs\FlexId\FlexIdGenerator;
+use Pvmlibs\FlexId\HMAC\SiphashHMAC;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
 use Pvmlibs\FlexId\Tools\IdStats;
+use Pvmlibs\FlexId\Tools\KeyGen;
 
 /**
  * @internal
@@ -28,11 +31,11 @@ final class IdStatsTest extends TestCase
                 ),
             ),
             serializer: new CustomSerializer(),
-            encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
-                secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
+            encrypter: new Sparx64Encrypter(
+                base64secret: KeyGen::generate(),
                 serializer: new BaseSerializer(),
             ),
-            signer: new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer()),
+            signer: new Signer(new BaseSerializer(), new SiphashHMAC('PsQBSNyMoz60RpQnSKWBMg==')),
             yearsDelta: [0, 10, 50, 100, 350],
         );
         $this::assertNotEmpty($idDistribution->presentation());
@@ -50,11 +53,11 @@ final class IdStatsTest extends TestCase
                 ),
             ),
             serializer: new CustomSerializer(),
-            encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
-                secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
+            encrypter: new Sparx64Encrypter(
+                base64secret: KeyGen::generate(),
                 serializer: new BaseSerializer(),
             ),
-            signer: new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer()),
+            signer: new Signer(new BaseSerializer(), new SiphashHMAC('PsQBSNyMoz60RpQnSKWBMg==')),
             yearsDelta: [0, 10, 50, 100, 350],
         );
         $this::assertNotEmpty($idDistribution->presentation());
@@ -72,11 +75,11 @@ final class IdStatsTest extends TestCase
                 ),
             ),
             serializer: new CustomSerializer(),
-            encrypter: new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
-                secret: \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(),
+            encrypter: new Sparx64Encrypter(
+                base64secret: KeyGen::generate(),
                 serializer: new BaseSerializer(),
             ),
-            signer: new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer()),
+            signer: new Signer(new BaseSerializer(), new SiphashHMAC('PsQBSNyMoz60RpQnSKWBMg==')),
         );
         $this::assertNotEmpty($idDistribution->presentation());
     }

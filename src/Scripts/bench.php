@@ -8,6 +8,7 @@ use Pvmlibs\FlexId\Resolvers\StaticWorkerResolver;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Tools\IdStats;
+use Pvmlibs\FlexId\Tools\KeyGen;
 
 require_once 'vendor/autoload.php';
 
@@ -17,19 +18,17 @@ $resolver = new StaticWorkerResolver(
     sequenceBits: 10,
     workerLockFilePath: null,
 );
-$generator = new FlexIdGenerator(workerResolver: $resolver);
 
 $bench = new IdStats(
     generator: new FlexIdGenerator(workerResolver: $resolver),
     serializer: new CustomSerializer(),
     encrypter: new Sparx64Encrypter(
-        secret: Sparx64Encrypter::generateSecret(),
+        base64secret: KeyGen::generate(),
         serializer: new BaseSerializer(),
     ),
     signer: new Pvmlibs\FlexId\Signers\Signer(
-        secret: Pvmlibs\FlexId\Signers\Signer::generateSecret(),
         serializer: new BaseSerializer(),
-        hashAlgo: 'sha256',
+        hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC(KeyGen::generate()),
     ),
 );
 

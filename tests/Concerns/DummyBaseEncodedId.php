@@ -6,10 +6,12 @@ namespace Tests\Concerns;
 
 use Pvmlibs\FlexId\Concerns\HasIdHandler;
 use Pvmlibs\FlexId\Contracts\IdHandlerContract;
+use Pvmlibs\FlexId\HMAC\Sha256HMAC;
 use Pvmlibs\FlexId\IdHandlers\EncodedId;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Serializers\HashSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
+use Pvmlibs\FlexId\Tools\KeyGen;
 
 /**
  * @internal
@@ -27,8 +29,8 @@ abstract class DummyBaseEncodedId
             new EncodedId(
                 new HashSerializer(),
                 new Signer(
-                    secret: 'rCl29//aZ51LjLQZKUbMUA==',
                     serializer: new BaseSerializer(),
+                    hmac: new Sha256HMAC(KeyGen::generate()),
                 ),
             ),
         ];

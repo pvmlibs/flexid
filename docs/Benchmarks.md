@@ -1,9 +1,12 @@
 ## Benchmarks
 
 For best performance, make sure you don't have loaded debugging or code coverage extensions like xdebug, pcov or make
-sure they are turned off. Opcache helps especially with JIT (2x-8x faster), but with JIT can be unstable (mainly SIGSEGV,
-depending on php version, application code and hardware - known problem in php).
-For signing, use fast hash when possible, e.g. siphash-2-4 (requires sodium extension).
+sure they are turned off.
+For signing, use the fastest hash when possible, e.g. SiphashHMAC (requires sodium or flexid_utils extension).
+
+For ultimate performance, use flexid_utils extension. It can achieve 8-40x better results for:
+CustomSerializer, BaseSerializer, HashSerializer, Sparx64Encrypter and Sparx128Encrypter.
+These classes automatically uses extension if available and have fallback to PHP implementation if not.
 
 
 ### Unique ID generation with Redis
@@ -23,57 +26,44 @@ y-axis "ID/s"
 
 ### Other tools performance
 
-**PHP 8.5.7, no opcache**
+**PHP 8.5.11, no opcache**
+
+Test with 10k operations:| without flexid extension | with flexid extension
+-|--------------------------|-
+FlexIdGenerator with StaticWorkerResolver        | 4,281,033 ops/s          |4,466,315 ops/s
+FlexIdGenerator with RandomWorkerResolver        | 2,045,475 ops/s          |2,359,001 ops/s
+BaseSerializer serialize                         | 1,652,554 ops/s          |8,552,418 ops/s
+BaseSerializer deserialize                       | 1,207,243 ops/s          |9,539,873 ops/s
+CustomSerializer serialize                       | 714,438 ops/s            |7,327,355 ops/s
+CustomSerializer deserialize                     | 768,319 ops/s            |8,317,585 ops/s
+HashSerializer serialize                         | 1,083,244 ops/s          |7,343,902 ops/s
+HashSerializer deserialize                       | 1,425,161 ops/s          |7,219,810 ops/s
+HexSerializer serialize                          | 8,891,054 ops/s          |9,088,017 ops/s
+HexSerializer deserialize                        | 6,785,982 ops/s          |6,909,298 ops/s
+Base64Serializer serialize                       | 4,837,986 ops/s          |5,066,934 ops/s
+Base64Serializer deserialize                     | 4,678,581 ops/s          |4,747,817 ops/s
+Sparx64Encrypter encrypt                         | 252,806 ops/s            |4,098,156 ops/s
+Sparx64Encrypter decrypt                         | 229,610 ops/s            |3,817,448 ops/s
+Sparx64Encrypter encrypt (+sign siphash-2-4)     | 217,775 ops/s            |1,888,541 ops/s
+Sparx64Encrypter decrypt (+sign siphash-2-4)     | 208,710 ops/s            |1,395,155 ops/s
+Sparx128Encrypter encrypt (+sign siphash-2-4)    | 81,746 ops/s             |1,602,023 ops/s
+Sparx128Encrypter decrypt (+sign siphash-2-4)    | 77,470 ops/s             |1,308,199 ops/s
+Sparx128TurboEncrypter encrypt (+sign siphash-2-4)|-                        |2,440,689 ops/s
+Sparx128TurboEncrypter decrypt (+sign siphash-2-4)|-                        |2,026,600 ops/s
+AesEncrypter encrypt (+sign siphash-2-4)         | 435,653 ops/s            |625,755 ops/s
+AesEncrypter decrypt (+sign siphash-2-4)         | 372,302 ops/s            |590,805 ops/s
+XChaCha20Encrypter encrypt (+sign Poly1305)      | 1,154,302 ops/s          |1,147,346 ops/s
+XChaCha20Encrypter decrypt (+sign Poly1305)      | 1,194,318 ops/s          |1,188,754 ops/s
+Signer (BaseSerializer) sign siphash-2-4         | 1,300,579 ops/s          |2,673,275 ops/s
+Signer (BaseSerializer) verify siphash-2-4       | 1,136,945 ops/s          |1,856,741 ops/s
+SiphashHMAC sign                                 | 3,661,067 ops/s          |7,928,831 ops/s
+Blake3HMACFlexIdExt sign                         | -                        |4,886,291 ops/s
+Blake2HMACSodiumExt sign                         | 1,608,516 ops/s          |1,661,030 ops/s
+Sha256HMAC sign                                  | 929,034 ops/s            |952,938 ops/s
+
+For comparison Sqids package (functionally similar to HashSerializer - short, random-looking id):
 
 Test with 10k operations:| ops/s
 -|-
-FlexIdGenerator with StaticWorkerResolver       |  3,861,591
-FlexIdGenerator with RandomWorkerResolver       |  1,868,891
-BaseSerializer serialize                        |  2,100,734
-BaseSerializer deserialize                      |  1,658,946
-CustomSerializer (positive int) serialize       |  1,760,244
-CustomSerializer (positive int) deserialize     |  1,689,146
-CustomSerializer (full range bcmath) serialize  |  1,162,699
-CustomSerializer (full range bcmath) deserialize|  1,106,927
-CustomSerializer (full range gmp) serialize     |  1,232,817
-CustomSerializer (full range gmp) deserialize   |  1,080,921
-HashSerializer serialize                        |  1,309,000
-HashSerializer deserialize                      |  1,127,885
-HexSerializer serialize                         |  7,176,438
-HexSerializer deserialize                       |  6,634,186
-Base64Serializer serialize                      |  5,348,403
-Base64Serializer deserialize                    |  4,428,345
-Sparx64Encrypter encrypt                        |  271,522
-Sparx64Encrypter decrypt                        |  256,186
-AesEncrypter encrypt                            |  303,604
-AesEncrypter decrypt                            |  274,772
-XChaCha20Encrypter encrypt                      |  651,306
-XChaCha20Encrypter decrypt                      |  881,888
-Signer (siphash + HexSerializer) sign           |  1,893,738
-Signer (siphash + HexSerializer) verify         |  1,641,823
-Signer (sha256 + BaseSerializer) sign           |  600,173
-Signer (sha256 + BaseSerializer) verify         |  536,371
-
-### Latency test
-
-Testing for low volume operations - 100 operations, including instance creation and preparation overhead. Lowest result
-from 3 runs, no opcache, sorted from the lowest time. Added popular php package sqids/sqids for comparison:
-
-operation|time
--|-
-HashSerializer serialize                    | 0.051 ms
-XChaCha20Encrypter 256-bit key, 128-bit sign  | 0.253 ms
-Sparx64Encrypter 128-bit key, 64-bit sign     | 0.765 ms
-Sqids v0.5 encode                             | 1.684 ms
-AesEncrypter 256-bit key, 64-bit sign         | 1.969 ms
-
-### Opcache influence
-
-Almost all tools scale well with opcache and jit, test with 10k operations:
-
-tool | no opcache, ops/s | opcache + jit function, ops/s
--|-------------------|-
-HashSerializer serialize                      | 1,309,000         | 2,602,023
-Sparx64Encrypter encrypt                      | 271,522           | 796,851
-Sqids v0.5 encode                             | 147,612           | 174,011
-
+Sqids v0.5 serialize                              | 151,610 ops/s
+Sqids v0.5 deserialize                            | 341,227 ops/s

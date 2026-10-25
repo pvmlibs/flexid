@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Encrypters;
 
-use Pvmlibs\FlexId\Contracts\EncrypterContract;
+use Pvmlibs\FlexId\Contracts\EncrypterWithMacContract;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdDecryptException;
 
@@ -19,7 +19,7 @@ use Pvmlibs\FlexId\Exceptions\IdDecryptException;
  *
  * See more https://doc.libsodium.org/doc/secret-key_cryptography/aead
  */
-class XChaCha20Encrypter implements EncrypterContract
+class XChaCha20Encrypter implements EncrypterWithMacContract
 {
     private string $key;
 
@@ -41,21 +41,24 @@ class XChaCha20Encrypter implements EncrypterContract
     private int $outputLength;
 
     /**
-     * @param string $secret       Secret key used by cipher. This needs to be treated with high confidentiality, do not
+     * @param string $base64secret Secret key used by cipher. This needs to be treated with high confidentiality, do not
      *                             include it in source code. Can use generateSecret() method to produce the secret.
-     * @param bool   $base64Encode use url safe base64 encoding if true, otherwise hex encoding
+     * @param bool   $base64Encode use url safe base64 encoding if true, otherwise use hex encoding
      *
      * @throws \InvalidArgumentException
      */
     public function __construct(
         #[\SensitiveParameter]
-        string $secret,
+        string $base64secret,
         private bool $base64Encode = true,
     ) {
+        // @codeCoverageIgnoreStart
         if (extension_loaded('sodium') === false || function_exists('sodium_crypto_aead_xchacha20poly1305_ietf_encrypt') === false) {
             throw new \RuntimeException('Sodium extension or xchacha20poly1305_ietf function is not available');
         }
-        $key = \base64_decode($secret, true);
+        // @codeCoverageIgnoreEnd
+
+        $key = \base64_decode($base64secret, true);
 
         if ($key === false || \strlen($key) !== 32) {
             throw new \InvalidArgumentException(\sprintf('Secret key must be 32 bytes long.'));
@@ -73,30 +76,24 @@ class XChaCha20Encrypter implements EncrypterContract
         }
     }
 
-    public static function generateSecret(): string
-    {
-        return \base64_encode(\sodium_crypto_aead_chacha20poly1305_keygen());
-    }
-
     public function encrypt(int $id, string $additionalData = ''): string
     {
-        $totalNounces = 50;
-        static $nounces = [];
+        $totalNounces = 10;
+        static $nounces = '';
+        /** @var non-negative-int $nounceIndex */
         static $nounceIndex = 0;
 
         // preallocate $totalNounces nounces at once - much faster for encrypting many ids
-        if ($nounceIndex === 0) {
-            $bytes = \random_bytes($this->nonceLength * $totalNounces);
-            for ($i = 0; $i < $totalNounces; $i++) {
-                $nounces[$i] = \substr($bytes, $i * $this->nonceLength, $this->nonceLength);
-            }
+        if ($nounceIndex === 0 || $nounceIndex === $totalNounces) {
+            $nounces = \random_bytes($this->nonceLength * $totalNounces);
+            $nounceIndex = 0;
         }
 
-        $nonce = $nounces[$nounceIndex];
-        $nounceIndex = ($nounceIndex + 1) % $totalNounces;
+        $nonce = \substr($nounces, $nounceIndex * $this->nonceLength, $this->nonceLength);
+        $nounceIndex++;
 
         $ciphertext = \sodium_crypto_aead_xchacha20poly1305_ietf_encrypt(
-            message: \pack('J', $id),
+            message: \pack('Q', $id),
             additional_data: $additionalData, // additional data for authentication
             nonce: $nonce,
             key: $this->key,
@@ -137,7 +134,7 @@ class XChaCha20Encrypter implements EncrypterContract
             throw new IdDecryptException('Could not decrypt id');
         }
 
-        $id = @unpack('J', $decrypted);
+        $id = @unpack('Q', $decrypted);
 
         if ($id === false) {
             throw new IdDecryptException('Could not extract id');

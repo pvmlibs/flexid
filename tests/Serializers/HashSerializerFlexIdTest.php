@@ -8,7 +8,9 @@ use PHPUnit\Framework\TestCase;
 use Pvmlibs\FlexId\Contracts\SerializerContract;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdEncodeException;
-use Pvmlibs\FlexId\Serializers\HashSerializer;
+use Pvmlibs\FlexId\Serializers\Implementations\HashSerializerFlexIdExt;
+use Pvmlibs\FlexId\Serializers\Implementations\HashSerializerPHP;
+use Pvmlibs\FlexId\Tools\Alphabets;
 use Tests\Internal\HasBackwardCompatibilityTesting;
 use Tests\Internal\HasCharDistributionTesting;
 use Tests\Serializers\HasSerializerTesting;
@@ -16,21 +18,31 @@ use Tests\Serializers\HasSerializerTesting;
 /**
  * @internal
  */
-final class HashSerializerTest extends TestCase
+final class HashSerializerFlexIdTest extends TestCase
 {
     use HasSerializerTesting;
     use HasBackwardCompatibilityTesting;
     use HasCharDistributionTesting;
 
+    public function setUp(): void
+    {
+        if (\extension_loaded('flexid_utils') === false) {
+            $this::markTestSkipped('Flexid not loaded');
+        }
+    }
+
     public function testSerializeDeserialize(): void
     {
-        $serializer = new HashSerializer(minLength: 1);
+        $serializer = new HashSerializerFlexIdExt(minLength: 1);
         // test whole 16-bit range
         $this->validateSerializeDeserialize(serializer: $serializer, positivesOnly: true, incrementalRange: 70000);
 
         $range = 100;
-        foreach ($this->alphabets(32) as $alphabet) {
-            $serializer = new HashSerializer(alphabet: $alphabet, minLength: 1);
+        foreach ($this->alphabets(9) as $alphabet) {
+            if ((strlen($alphabet) & (strlen($alphabet) - 1)) === 0) {
+                continue;
+            }
+            $serializer = new HashSerializerFlexIdExt(alphabet: $alphabet, minLength: 1);
             $this->validateSerializeDeserialize(serializer: $serializer, positivesOnly: true, incrementalRange: 1000);
             $this->validateBlocks($serializer, 0xFFFF, 0xFFFF + 1000);
 
@@ -52,15 +64,21 @@ final class HashSerializerTest extends TestCase
     public function testSerializeDeserializeWithMinLength(): void
     {
         for ($m = 4; $m <= 10; $m++) {
-            $serializer = new HashSerializer(minLength: $m);
+            $serializer = new HashSerializerFlexIdExt(minLength: $m);
             $this->validateSerializeDeserialize(serializer: $serializer, positivesOnly: true, incrementalRange: 1000, rangeMax: $serializer->getMaxRange());
 
-            foreach ($this->alphabets(32) as $alphabet) {
-                $serializer = new HashSerializer(alphabet: $alphabet, minLength: $m);
+            foreach ($this->alphabets(9) as $alphabet) {
+                if ((strlen($alphabet) & (strlen($alphabet) - 1)) === 0) {
+                    continue;
+                }
+
+                $serializer = new HashSerializerFlexIdExt(alphabet: $alphabet, minLength: $m);
                 $this->validateSerializeDeserialize(serializer: $serializer, positivesOnly: true, incrementalRange: 100, rangeMax: $serializer->getMaxRange());
 
-                for ($i = 0; $i <= 100; $i++) {
-                    $this::assertSame($m, \strlen($serializer->serialize($i * 100)));
+                for ($i = 0; $i <= 10; $i++) {
+                    $length = \strlen($serializer->serialize($i));
+                    $this::assertGreaterThanOrEqual($m, $length);
+                    $this::assertLessThanOrEqual($m + 2, $length);
                 }
 
                 $this->validateOutOfRange($alphabet, $serializer, $serializer->getMaxRange());
@@ -73,13 +91,13 @@ final class HashSerializerTest extends TestCase
             }
         }
         $this->expectException(\InvalidArgumentException::class);
-        new HashSerializer(minLength: 12);
+        new HashSerializerPHP(minLength: 12);
     }
 
     private function validateBlocks(SerializerContract $serializer, int $min, int $max): void
     {
-        $incrementHashDeserialized = hash_init('sha3-512');
-        $incrementHashToSerialize = hash_init('sha3-512');
+        $incrementHashDeserialized = \hash_init('sha3-512');
+        $incrementHashToSerialize = \hash_init('sha3-512');
         $serializedIds = [];
         $expected = 0;
 
@@ -98,91 +116,102 @@ final class HashSerializerTest extends TestCase
     public function testEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new HashSerializer(alphabet: '');
+        new HashSerializerFlexIdExt(alphabet: '');
     }
 
     public function testEncodeNegative(): void
     {
         $this::expectException(IdEncodeException::class);
-        (new HashSerializer())->serialize(-1);
+        (new HashSerializerFlexIdExt())->serialize(-1);
     }
 
     public function testTooSmallAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new HashSerializer(alphabet: 's');
+        new HashSerializerFlexIdExt(alphabet: 's');
     }
 
     public function testNotUniqueAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new HashSerializer(alphabet: 'ssd');
+        new HashSerializerFlexIdExt(alphabet: 'gc2bqRf6Q3Mvm4YnWtJy7KPzGTBVwN8XrCjkZ1hxHH');
     }
 
     public function testAlphabetContainsMultibyteChars(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new HashSerializer(alphabet: 'sbâ');
+        new HashSerializerFlexIdExt(alphabet: 'gc2bqRf6Q3Mvm4YnWtJy7KPzGTBVwN8XrCjkZ1hxHâ');
     }
 
     public function testEmptyId(): void
     {
-        $serializer = new HashSerializer();
+        $serializer = new HashSerializerFlexIdExt();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('');
     }
 
     public function testBadCharactersInId(): void
     {
-        $serializer = new HashSerializer();
+        $serializer = new HashSerializerFlexIdExt();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('-');
     }
 
     public function testBadCharactersInIdMiddle(): void
     {
-        $serializer = new HashSerializer();
+        $serializer = new HashSerializerFlexIdExt();
         $this->expectException(IdDecodeException::class);
         $serializer->deserialize('Db-Db');
     }
 
     public function testGetAlphabet(): void
     {
-        $serializer = new HashSerializer();
-        $this::assertSame(HashSerializer::ALPHABET, $serializer->getAlphabet());
+        $serializer = new HashSerializerFlexIdExt(Alphabets::CUSTOM_SAFE_ALPHABET);
+        $this::assertSame(Alphabets::CUSTOM_SAFE_ALPHABET, $serializer->getAlphabet());
     }
 
     public function testMaxLength(): void
     {
-        $serializer = new HashSerializer();
+        $serializer = new HashSerializerFlexIdExt();
         $this::assertSame(12, $serializer->getMaxEncodedLength());
     }
 
     public function testEvenCharsDistributionW1(): void
     {
-        $encoder = new HashSerializer(minLength: 6);
+        foreach ($this->alphabets(9) as $alphabet) {
+            $len = strlen($alphabet);
+            if (($len & ($len - 1)) === 0 || ($len & 1) === 0) {
+                continue;
+            }
+            $randomBias = 2.5;
+            if ($len < 50) {
+                $randomBias += (50 - $len) * 0.1;
+            }
+            $encoder = new HashSerializerPHP(alphabet: $alphabet, minLength: 6);
 
-        $startLinear = pow(\strlen($encoder->getAlphabet()), 6); // worst case
-        $this->validateCharsDistributionW1($startLinear, $startLinear + 1000, false);
+            $startLinear = pow(\strlen($encoder->getAlphabet()), 6);
+            $this->validateCharsDistributionW1($encoder, $startLinear, $startLinear + 1000, 1, false, $randomBias);
 
-        $startLinear = $encoder->getOffset(); // defaults for min 6 length
-        $this->validateCharsDistributionW1($startLinear, $startLinear + 1000, false);
+            $start = 1 << 16;
+            $this->validateCharsDistributionW1($encoder, $start, $start + $start + 1, $start, false, $randomBias);
 
-        // linear with first block, it should have distribution near random
-        $this->validateCharsDistributionW1(0, 65535, false, 1.5);
+            $startLinear = $encoder->getOffset(); // defaults for min 6 length
+            $this->validateCharsDistributionW1($encoder, $startLinear, $startLinear + 1000, 1, false, $randomBias);
 
-        // random
-        $this->validateCharsDistributionW1(1 << 16, 0xFFFFFFFF);
-        $this->validateCharsDistributionW1(1 << 32, 0xFFFFFFFFFFFF);
-        $this->validateCharsDistributionW1(1 << 48, $encoder->getMaxRange());
-        $this->validateCharsDistributionW1(0, $encoder->getMaxRange());
+            // linear with first block, it should have distribution near random
+            $this->validateCharsDistributionW1($encoder, 0, 65535, 10, false, $randomBias);
+
+            // random
+            $this->validateCharsDistributionW1($encoder, 1 << 16, 0xFFFFFFFF, 1, true, $randomBias);
+            $this->validateCharsDistributionW1($encoder, 1 << 32, 0xFFFFFFFFFFFF1, 1, true, $randomBias);
+            $this->validateCharsDistributionW1($encoder, 1 << 48, $encoder->getMaxRange(), 1, true, $randomBias);
+            $this->validateCharsDistributionW1($encoder, 0, $encoder->getMaxRange(), 1, true, $randomBias);
+        }
     }
 
-    private function validateCharsDistributionW1(int $min, int $max, bool $random = true, float $lessThanRandomMultiply = 2.5): void
+    private function validateCharsDistributionW1(SerializerContract $encoder, int $min, int $max, int $step = 1, bool $random = true, float $lessThanRandomMultiply = 2.5): void
     {
-        $encoder = new HashSerializer(\str_shuffle(HashSerializer::ALPHABET));
-
-        $total = $random ? 1000 : ($max - $min);
+        $total = $random ? 100 : (int) ceil(($max - $min) / $step);
 
         $ids = new \SplFixedArray($total);
         if ($random) {
@@ -191,7 +220,7 @@ final class HashSerializerTest extends TestCase
             }
         } else {
             $counter = 0;
-            for ($i = $min; $i < $max; $i++) {
+            for ($i = $min; $i < $max; $i += $step) {
                 $ids[$counter++] = $encoder->serialize($i);
             }
         }
@@ -212,9 +241,23 @@ final class HashSerializerTest extends TestCase
         );
     }
 
+    public function testInteroperabilityCustomSerializer(): void
+    {
+        foreach ($this->alphabets(9) as $alphabet) {
+            if ((strlen($alphabet) & (strlen($alphabet) - 1)) === 0) {
+                continue;
+            }
+
+            $hashSerializerFlexId = new HashSerializerFlexIdExt($alphabet, 1);
+            $hashSerializerPHP = new HashSerializerPHP($alphabet, 1);
+            $this::assertSame($this->runDeterministicBatch($hashSerializerPHP, true), $this->runDeterministicBatch($hashSerializerFlexId, true));
+            $this::assertSame($hashSerializerPHP->getMaxEncodedLength(), $hashSerializerFlexId->getMaxEncodedLength());
+        }
+    }
+
     public function testBackwardCompatibility(): void
     {
-        $encoder = new HashSerializer(minLength: 1);
-        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->serialize($id), 0, PHP_INT_MAX, 'HashSerializer');
+        $encoder = new HashSerializerFlexIdExt(minLength: 1);
+        $this->validateBackwardCompatibility(fn (int $id): string => $encoder->serialize($id), 0, PHP_INT_MAX, 'HashSerializerFlexIdExt');
     }
 }

@@ -2,16 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Encrypters;
+namespace Tests\Encrypters;
 
 use PHPUnit\Framework\TestCase;
+use Pvmlibs\FlexId\Contracts\HMACContract;
 use Pvmlibs\FlexId\Contracts\SerializerContract;
 use Pvmlibs\FlexId\Encrypters\AesEncrypter;
 use Pvmlibs\FlexId\Exceptions\IdBadSignException;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdDecryptException;
+use Pvmlibs\FlexId\HMAC\Blake2HMACSodiumExt;
+use Pvmlibs\FlexId\HMAC\Sha256HMAC;
+use Pvmlibs\FlexId\HMAC\SiphashHMAC;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
-use Tests\Encrypters\HasEncrypterTesting;
+use Pvmlibs\FlexId\Serializers\HexSerializer;
+use Pvmlibs\FlexId\Tools\Alphabets;
+use Pvmlibs\FlexId\Tools\KeyGen;
 use Tests\Internal\HasBackwardCompatibilityTesting;
 use Tests\Internal\HasCharDistributionTesting;
 
@@ -26,75 +32,65 @@ final class AesEncrypterTest extends TestCase
 
     public function testEncryptDecryptWithBase64EncodingSipHash(): void
     {
-        $this->runBatchForEncoding(secret: AesEncrypter::generateSecret(), serializer: null, macHash: 'siphash-2-4');
+        $key = KeyGen::generate();
+        $hmac = new SiphashHMAC($key);
+        $this->runBatchForEncoding(secret: $key, serializer: new BaseSerializer(), hmac: $hmac);
     }
 
     public function testEncryptDecryptWithHexBlake2b(): void
     {
-        $this->runBatchForEncoding(secret: AesEncrypter::generateSecret(), serializer: null, macHash: 'blake2b');
+        $key = KeyGen::generate();
+        $hmac = new Blake2HMACSodiumExt($key);
+        $this->runBatchForEncoding(secret: $key, serializer: new BaseSerializer(), hmac: $hmac);
     }
 
     public function testEncryptDecryptWithHexSha256(): void
     {
-        $this->runBatchForEncoding(secret: AesEncrypter::generateSecret(), serializer: null, macHash: 'sha256');
-    }
-
-    public function testEncryptDecryptWithSerializer(): void
-    {
-        $this->runBatchForEncoding(secret: AesEncrypter::generateSecret(), serializer: new BaseSerializer(), macHash: 'siphash-2-4');
-    }
-
-    public function testEncryptDecryptKey192bit(): void
-    {
-        $this->runBatchForEncoding(secret: AesEncrypter::generateSecret(24), serializer: null, macHash: 'siphash-2-4');
-    }
-
-    public function testEncryptDecryptKey128bit(): void
-    {
-        $this->runBatchForEncoding(secret: AesEncrypter::generateSecret(16), serializer: null, macHash: 'siphash-2-4');
-    }
-
-    public function testUnsupportedMacHash(): void
-    {
-        $this::expectException(\InvalidArgumentException::class);
-        new AesEncrypter(AesEncrypter::generateSecret(), 'xxh64');
-    }
-
-    public function testInvalidKeyLength(): void
-    {
-        $this::expectException(\InvalidArgumentException::class);
-        new AesEncrypter('dshwe');
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $this->runBatchForEncoding(secret: $key, serializer: new BaseSerializer(), hmac: $hmac);
     }
 
     public function testInvalidSeparator(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new AesEncrypter(secret: AesEncrypter::generateSecret(), separator: '--');
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer(), separator: '--');
     }
 
     public function testExcludedSeparator(): void
     {
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
         $this->expectException(\InvalidArgumentException::class);
-        new AesEncrypter(secret: AesEncrypter::generateSecret(), serializer: new BaseSerializer(), separator: BaseSerializer::ALPHABET[0]);
+        new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer(Alphabets::BASE32_SAFE_ALPHABET), separator: Alphabets::BASE32_SAFE_ALPHABET[0]);
     }
 
     public function testTooLongCiphertextDecrypt(): void
     {
-        $encrypter = new AesEncrypter(AesEncrypter::generateSecret());
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $encrypter = new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer());
         $this::expectException(IdDecodeException::class);
         $encrypter->decrypt('rdjdhfger9jfdglksdf34rlkmsdfpwjfs');
     }
 
     public function testEmptyCiphertextDecrypt(): void
     {
-        $encrypter = new AesEncrypter(AesEncrypter::generateSecret());
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $encrypter = new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer());
         $this::expectException(IdDecodeException::class);
         $encrypter->decrypt('');
     }
 
     public function testRandomCiphertextDecrypt(): void
     {
-        $encrypter = new AesEncrypter(AesEncrypter::generateSecret());
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $encrypter = new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer());
+
         $counter = 0;
         for ($i = 0; $i < 1000; $i++) {
             try {
@@ -108,16 +104,18 @@ final class AesEncrypterTest extends TestCase
 
     public function testAlterCiphertextDecrypt(): void
     {
+
         $counter = 0;
         for ($i = 0; $i < 1000; $i++) {
             try {
-                $key = AesEncrypter::generateSecret();
-                $encrypter = new AesEncrypter($key);
+                $key = KeyGen::generate();
+                $hmac = new Sha256HMAC($key);
+                $encrypter = new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer());
                 $ciphertext = $encrypter->encrypt($i);
                 $ciphertextAltered = \str_shuffle($ciphertext);
 
                 $encrypter->decrypt($ciphertextAltered);
-            } catch (IdBadSignException $e) {
+            } catch (IdBadSignException|IdDecodeException $e) {
                 $counter++;
                 continue;
             }
@@ -127,13 +125,13 @@ final class AesEncrypterTest extends TestCase
         $this::assertSame(1000, $counter);
     }
 
-    private function runBatchForEncoding(string $secret, ?SerializerContract $serializer, string $macHash): void
+    private function runBatchForEncoding(string $secret, SerializerContract $serializer, HMACContract $hmac): void
     {
-        $encrypter = new AesEncrypter(secret: $secret, serializer: $serializer, macHash: $macHash);
+        $encrypter = new AesEncrypter(base64secret: $secret, hmac: $hmac, serializer: $serializer);
         $encrypted = [];
-        $this->runBatch($encrypter, $encrypted);
+        $this->runBatchWithAd($encrypter, $encrypted);
         $ad = \random_bytes(8);
-        $expected = $this->runBatch($encrypter, $encrypted, $ad);
+        $expected = $this->runBatchWithAd($encrypter, $encrypted, $ad);
         $this::assertCount($expected, $encrypted, 'There are duplicates');
 
         $encryptedNoAD = $encrypter->encrypt(100);
@@ -146,32 +144,33 @@ final class AesEncrypterTest extends TestCase
         $this::assertSame(100, $decryptedNoAD);
         $this::assertSame(100, $decryptedWithAD);
 
-        if ($serializer !== null) {
-            $this::assertSame($serializer->getMaxEncodedLength() * 2, $encrypter->maxOutputLength());
-        } else {
-            $this::assertSame(32, $encrypter->maxOutputLength());
-        }
+        $this::assertSame($serializer->getMaxEncodedLength() * 2, $encrypter->maxOutputLength());
+
         $this::expectException(IdBadSignException::class);
         $encrypter->decrypt($encryptedWithAD);
     }
 
     public function testWrongSecret(): void
     {
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
         $this->expectException(\InvalidArgumentException::class);
-        new AesEncrypter(secret: 'asfdsd');
+        new AesEncrypter(base64secret: 'asfdsd', hmac: $hmac, serializer: new BaseSerializer());
     }
 
     public function testEvenCharsDistributionHex(): void
     {
-        $secret = AesEncrypter::generateSecret();
-        $encrypter = new AesEncrypter(secret: $secret);
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $serializer = new HexSerializer();
+        $encrypter = new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: $serializer);
 
         $total = 1000;
         $ids = new \SplFixedArray($total);
         for ($i = 0; $i < $total; $i++) {
             $ids[$i] = $encrypter->encrypt(\random_int(0, PHP_INT_MAX));
         }
-        $maxDeviations = $this->getMaxDeviation($ids, '0123456789abcdef');
+        $maxDeviations = $this->getMaxDeviation($ids, $serializer->getAlphabet());
         // should be close to random, max deviation 3 times as random one from mean
         $this::assertLessThan(
             $maxDeviations['random'] * 3,
@@ -188,7 +187,9 @@ final class AesEncrypterTest extends TestCase
 
     public function testBackwardCompatibility(): void
     {
-        $encrypter = new AesEncrypter(secret: 'HtPA2DA8cy2gRUC4h+tKnKIjUt5xuLJzkmKc3MtwZpc=');
+        $key = 'HtPA2DA8cy2gRUC4h+tKnKIjUt5xuLJzkmKc3MtwZpc=';
+        $hmac = new Sha256HMAC($key);
+        $encrypter = new AesEncrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer());
         $this->validateBackwardCompatibility(fn (int $id): string => $encrypter->encrypt($id), PHP_INT_MIN, PHP_INT_MAX, 'AesEncrypter');
     }
 }

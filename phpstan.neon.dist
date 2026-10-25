@@ -22,7 +22,8 @@ parameters:
         - src
         - tests
     tmpDir: cache/phpstan
-
+    bootstrapFiles:
+        - stubs/flexid_utils.stub.php
     ignoreErrors:
         -
             # phpunit assertCount is inefficient with large arrays

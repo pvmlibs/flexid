@@ -2,17 +2,14 @@
 
 declare(strict_types=1);
 
-use Pvmlibs\FlexId\Encrypters\AesEncrypter;
-use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
-use Pvmlibs\FlexId\Encrypters\XChaCha20Encrypter;
 use Pvmlibs\FlexId\FlexIdGenerator;
-use Pvmlibs\FlexId\Resolvers\RandomWorkerResolver;
 use Pvmlibs\FlexId\Resolvers\StaticWorkerResolver;
 use Pvmlibs\FlexId\Serializers\Base64Serializer;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Serializers\CustomSerializer;
 use Pvmlibs\FlexId\Serializers\HashSerializer;
 use Pvmlibs\FlexId\Serializers\HexSerializer;
+use Pvmlibs\FlexId\Tools\Alphabets;
 
 require_once 'vendor/autoload.php';
 
@@ -22,49 +19,48 @@ $resolverStatic = new StaticWorkerResolver(
     sequenceBits: 10,
     workerLockFilePath: null,
 );
-$resolverRandom = new RandomWorkerResolver();
+$resolverRandom = new Pvmlibs\FlexId\Resolvers\RandomWorkerResolver();
 $generatorStatic = new FlexIdGenerator(workerResolver: $resolverStatic);
 $generatorRandom = new FlexIdGenerator(workerResolver: $resolverRandom);
 
-$encrypterSparx = new Sparx64Encrypter(
-    secret: 'rCl29//aZ51LjLQZKUbMUA==',
-    serializer: new BaseSerializer(),
-);
-
-$baseSerializer = new BaseSerializer();
+$baseSerializer = new BaseSerializer(Alphabets::BASE64_ALPHABET);
 $hexSerializer = new HexSerializer();
 $base64Serializer = new Base64Serializer();
 $hashSerializer = new HashSerializer();
-$customSerializerPositives = new CustomSerializer();
+$customSerializer = new CustomSerializer();
+
 if (extension_loaded('bcmath')) {
-    $customSerializerBCMath = new CustomSerializer(new Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersBCMath());
-}
-if (extension_loaded('gmp')) {
-    $customSerializerGMP = new CustomSerializer(new Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersGmp());
+    $customSerializer = new CustomSerializer(new Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersBCMath());
+} elseif (extension_loaded('gmp')) {
+    $customSerializer = new CustomSerializer(new Pvmlibs\FlexId\Serializers\IntegerOperations\FullRangeIntegersGmp());
 }
 
-$signer = new Pvmlibs\FlexId\Signers\Signer(
-    secret: 'rCl29//aZ51LjLQZKUbMUA==',
-    serializer: new BaseSerializer(),
-);
-
-$aes = new AesEncrypter(
-    secret: AesEncrypter::generateSecret(),
-    serializer: new BaseSerializer(),
-);
+$key32bit = Pvmlibs\FlexId\Tools\KeyGen::generate();
 
 $reportFile = __DIR__ . '/RefPerf/perf.txt';
 
 if (extension_loaded('sodium')) {
-    $fastSigner = new Pvmlibs\FlexId\Signers\Signer(
-        secret: 'rCl29//aZ51LjLQZKUbMUA==',
-        serializer: new HexSerializer(),
-        hashAlgo: 'siphash-2-4',
+    $XChaCha20Encrypter = new Pvmlibs\FlexId\Encrypters\XChaCha20Encrypter(
+        base64secret: $key32bit,
+        base64Encode: false,
     );
-    $encrypterChaCha = new XChaCha20Encrypter(
-        secret: '3khTuzik9M4LpRSrl1+Lk46OSA5TR2oJhSy3lV+6RS0=',
-    );
+    $defHashAlgo = 'siphash-2-4';
+    $hmac = new Pvmlibs\FlexId\HMAC\SiphashHMAC($key32bit);
+} else {
+    $defHashAlgo = 'sha256';
+    $hmac = new Pvmlibs\FlexId\HMAC\Sha256HMAC($key32bit);
 }
+
+$encrypterSparx64 = new Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
+    base64secret: $key32bit,
+    serializer: $baseSerializer,
+);
+
+$encrypterSparx128 = new Pvmlibs\FlexId\Encrypters\Sparx128Encrypter(
+    base64secret: $key32bit,
+    hmac: $hmac,
+    serializer: $baseSerializer,
+);
 
 $total = 10000;
 // range 0-0xFFFF better represents 64bit input data for serializers
@@ -82,28 +78,44 @@ for ($i = $step; $i < PHP_INT_MAX; $i += $step) {
 }
 
 $signer = new Pvmlibs\FlexId\Signers\Signer(
-    secret: 'rCl29//aZ51LjLQZKUbMUA==',
     serializer: new BaseSerializer(),
+    hmac: $hmac,
 );
 
-$sparx64Encrypter = new Sparx64Encrypter(
-    secret: 'rCl29//aZ51LjLQZKUbMUA==',
-    serializer: new BaseSerializer(),
-);
+if (extension_loaded('openssl')) {
+    $aesEncrypter = new Pvmlibs\FlexId\Encrypters\AesEncrypter(
+        base64secret: $key32bit,
+        hmac: $hmac,
+        serializer: new BaseSerializer(),
+    );
+}
 
-$aesEncrypter = new AesEncrypter(
-    secret: 'HtPA2DA8cy2gRUC4h+tKnKIjUt5xuLJzkmKc3MtwZpc=',
-    serializer: new BaseSerializer(),
-);
-
-$XChaCha20Encrypter = new XChaCha20Encrypter(
-    secret: 'HtPA2DA8cy2gRUC4h+tKnKIjUt5xuLJzkmKc3MtwZpc=',
-    base64Encode: false,
-);
-
-$header = sprintf('PHP: %s', PHP_VERSION_ID) . "\n";
-echo $header;
-file_put_contents($reportFile, $header);
+if (function_exists('opcache_get_status')) {
+    $opcache = @opcache_get_status();
+    if ($opcache === false) {
+        $isOpcache = false;
+    } else {
+        $isOpcache = (bool) $opcache['opcache_enabled'];
+    }
+} else {
+    $isOpcache = false;
+}
+$extensions = [];
+$extNames = ['sodium', 'bcmath', 'gmp', 'openssl', 'flexid_utils'];
+foreach ($extNames as $extName) {
+    if (extension_loaded($extName)) {
+        $extensions[] = $extName;
+    }
+}
+$jit = (bool) ini_get('opcache.jit');
+$resultOutput = sprintf(
+    'PHP: %s, opcache: %s, jit: %s, Extensions: %s',
+    PHP_VERSION_ID,
+    $isOpcache ? 'ON' : 'OFF',
+    ($isOpcache && $jit) ? 'ON' : 'OFF',
+    implode(', ', $extensions),
+) . "\n";
+echo "\n" . $resultOutput;
 
 // do short tests first to include warm up latency
 /**
@@ -113,7 +125,7 @@ file_put_contents($reportFile, $header);
  */
 function bench_100ops(Closure $closure, string $className, string $note = ''): SplFixedArray
 {
-    global $total, $reportFile;
+    global $total, $resultOutput;
     $ids = new SplFixedArray($total);
     $class = explode('\\', $className);
 
@@ -124,17 +136,19 @@ function bench_100ops(Closure $closure, string $className, string $note = ''): S
     }
 
     $end = hrtime(true);
-    $output = str_pad(end($class) . " {$note}", 45) . number_format(($end - $start) / 1e6, 3) . " ms\n";
+    $output = str_pad(end($class) . " {$note}", 60) . number_format(($end - $start) / 1e6, 3) . " ms\n";
     echo $output;
-    file_put_contents($reportFile, $output, FILE_APPEND);
+    $resultOutput .= $output;
 
     return $ids;
 }
 $encodeSection = "\nEncode 100 ids\n";
 echo $encodeSection;
-file_put_contents($reportFile, $encodeSection, FILE_APPEND);
+$resultOutput .= $encodeSection;
 
-bench_100ops(fn (int $index) => $customSerializerPositives->serialize((int) $positivesRands[$index]), $customSerializerPositives::class, 'encode');
+if (extension_loaded('bcmath') || extension_loaded('gmp')) {
+    bench_100ops(fn (int $index) => $customSerializer->serialize((int) $positivesRands[$index]), $customSerializer::class, 'encode');
+}
 bench_100ops(fn (int $index) => $baseSerializer->serialize((int) $positivesRands[$index]), $baseSerializer::class, 'encode');
 bench_100ops(fn (int $index) => $hashSerializer->serialize((int) $positivesRands[$index]), $hashSerializer::class, 'encode');
 bench_100ops(fn (int $index) => $hexSerializer->serialize((int) $positivesRands[$index]), $hexSerializer::class, 'encode');
@@ -142,15 +156,23 @@ bench_100ops(fn (int $index) => $base64Serializer->serialize((int) $positivesRan
 
 $encryptersSection = "\nEncrypt + sign 100 ids\n";
 echo $encryptersSection;
-file_put_contents($reportFile, $encryptersSection, FILE_APPEND);
+$resultOutput .= $encryptersSection;
 
-bench_100ops(fn (int $index) => $signer->getSignedId($sparx64Encrypter->encrypt((int) $fullRangeRands[$index])), $sparx64Encrypter::class, '128-bit key, 64-bit sign');
-bench_100ops(fn (int $index) => $aesEncrypter->encrypt((int) $fullRangeRands[$index]), $aesEncrypter::class, '256-bit key, 64-bit sign');
-bench_100ops(fn (int $index) => $XChaCha20Encrypter->encrypt((int) $fullRangeRands[$index]), $XChaCha20Encrypter::class, '256-bit key, 128-bit sign');
-
-$header = "\nTest with 10k operations:\n";
-echo $header;
-file_put_contents($reportFile, $header);
+bench_100ops(fn (int $index) => $signer->getSignedId($encrypterSparx64->encrypt((int) $fullRangeRands[$index])), $encrypterSparx64::class, "128-bit key, 64-bit sign {$defHashAlgo}");
+bench_100ops(fn (int $index) => $encrypterSparx128->encrypt((int) $fullRangeRands[$index]), $encrypterSparx128::class, "256-bit key, 64-bit sign {$defHashAlgo}");
+if (extension_loaded('flexid_utils')) {
+    $encrypterSparx128Turbo = new Pvmlibs\FlexId\Encrypters\Sparx128TurboEncrypter($key32bit);
+    bench_100ops(fn (int $index) => $encrypterSparx128Turbo->encrypt((int) $fullRangeRands[$index]), $encrypterSparx128Turbo::class, '256-bit key, 64-bit sign siphash-2-4');
+}
+if (extension_loaded('openssl')) {
+    bench_100ops(fn (int $index) => $aesEncrypter->encrypt((int) $fullRangeRands[$index]), $aesEncrypter::class, "256-bit key, 64-bit sign {$defHashAlgo}");
+}
+if (extension_loaded('sodium')) {
+    bench_100ops(fn (int $index) => $XChaCha20Encrypter->encrypt((int) $fullRangeRands[$index]), $XChaCha20Encrypter::class, '256-bit key, 128-bit sign Poly1305');
+}
+$batchSection = "\nTest with 10k operations:\n";
+echo $batchSection;
+$resultOutput .= $batchSection;
 
 /**
  * @param Closure(int $index): (int|string|array<int>) $closure
@@ -159,7 +181,7 @@ file_put_contents($reportFile, $header);
  */
 function bench(Closure $closure, string $className, string $note = ''): SplFixedArray
 {
-    global $total, $reportFile;
+    global $total, $resultOutput;
     $ids = new SplFixedArray($total);
     $class = explode('\\', $className);
 
@@ -172,7 +194,7 @@ function bench(Closure $closure, string $className, string $note = ''): SplFixed
     $end = hrtime(true);
     $output = str_pad(end($class) . " {$note}", 50) . number_format($total / (($end - $start) / 1e9)) . " ops/s\n";
     echo $output;
-    file_put_contents($reportFile, $output, FILE_APPEND);
+    $resultOutput .= $output;
 
     return $ids;
 }
@@ -184,17 +206,9 @@ bench(fn () => $generatorRandom->id(), $generatorRandom::class, 'with RandomWork
 $serializedIds = bench(fn (int $index) => $baseSerializer->serialize($fullRangeRands[$index]), $baseSerializer::class, 'serialize');
 bench(fn (int $index) => $baseSerializer->deserialize((string) $serializedIds[$index]), $baseSerializer::class, 'deserialize');
 
-$serializedIds = bench(fn (int $index) => $customSerializerPositives->serialize($positivesRands[$index]), $customSerializerPositives::class, '(positive int) serialize');
-bench(fn (int $index) => $customSerializerPositives->deserialize((string) $serializedIds[$index]), $customSerializerPositives::class, '(positive int) deserialize');
-
-if (extension_loaded('bcmath')) {
-    $serializedIds = bench(fn (int $index) => $customSerializerBCMath->serialize($fullRangeRands[$index]), $customSerializerBCMath::class, '(full range bcmath) serialize');
-    bench(fn (int $index) => $customSerializerBCMath->deserialize((string) $serializedIds[$index]), $customSerializerBCMath::class, '(full range bcmath) deserialize');
-}
-
-if (extension_loaded('gmp')) {
-    $serializedIds = bench(fn (int $index) => $customSerializerGMP->serialize($fullRangeRands[$index]), $customSerializerGMP::class, '(full range gmp) serialize');
-    bench(fn (int $index) => $customSerializerGMP->deserialize((string) $serializedIds[$index]), $customSerializerGMP::class, '(full range gmp) deserialize');
+if (extension_loaded('bcmath') || extension_loaded('gmp')) {
+    $serializedIds = bench(fn (int $index) => $customSerializer->serialize($fullRangeRands[$index]), $customSerializer::class, 'serialize');
+    bench(fn (int $index) => $customSerializer->deserialize((string) $serializedIds[$index]), $customSerializer::class, 'deserialize');
 }
 
 $serializedIds = bench(fn (int $index) => $hashSerializer->serialize($positivesRands[$index]), $hashSerializer::class, 'serialize');
@@ -207,23 +221,49 @@ $serializedIds = bench(fn (int $index) => $base64Serializer->serialize($fullRang
 bench(fn (int $index) => $base64Serializer->deserialize((string) $serializedIds[$index]), $base64Serializer::class, 'deserialize');
 
 // encrypters
-$encryptedIds = bench(fn (int $index) => $encrypterSparx->encrypt((int) $fullRangeRands[$index]), $encrypterSparx::class, 'encrypt');
-bench(fn (int $index) => $encrypterSparx->decrypt((string) $encryptedIds[$index]), $encrypterSparx::class, 'decrypt');
+$encryptedIds = bench(fn (int $index) => $encrypterSparx64->encrypt((int) $fullRangeRands[$index]), $encrypterSparx64::class, 'encrypt');
+bench(fn (int $index) => $encrypterSparx64->decrypt((string) $encryptedIds[$index]), $encrypterSparx64::class, 'decrypt');
+
+$encryptedIds = bench(fn (int $index) => $signer->getSignedId($encrypterSparx64->encrypt((int) $fullRangeRands[$index])), $encrypterSparx64::class, "encrypt (+sign {$defHashAlgo})");
+bench(fn (int $index) => $encrypterSparx64->decrypt($signer->getIdFromSigned((string) $encryptedIds[$index])), $encrypterSparx64::class, "decrypt (+sign {$defHashAlgo})");
+
+$encryptedIds = bench(fn (int $index) => $encrypterSparx128->encrypt((int) $fullRangeRands[$index]), $encrypterSparx128::class, "encrypt (+sign {$defHashAlgo})");
+bench(fn (int $index) => $encrypterSparx128->decrypt((string) $encryptedIds[$index]), $encrypterSparx128::class, "decrypt (+sign {$defHashAlgo})");
+
+if (extension_loaded('flexid_utils')) {
+    $encrypterSparx128Turbo = new Pvmlibs\FlexId\Encrypters\Sparx128TurboEncrypter($key32bit);
+    $encryptedIds = bench(fn (int $index) => $encrypterSparx128Turbo->encrypt((int) $fullRangeRands[$index]), $encrypterSparx128Turbo::class, 'encrypt (+sign siphash-2-4)');
+    bench(fn (int $index) => $encrypterSparx128Turbo->decrypt((string) $encryptedIds[$index]), $encrypterSparx128Turbo::class, 'decrypt (+sign siphash-2-4)');
+}
 
 if (extension_loaded('openssl')) {
-    $encryptedIds = bench(fn (int $index) => $aes->encrypt((int) $fullRangeRands[$index]), $aes::class, 'encrypt (+sign)');
-    bench(fn (int $index) => $aes->decrypt((string) $encryptedIds[$index]), $aes::class, 'decrypt (+sign)');
+    $encryptedIds = bench(fn (int $index) => $aesEncrypter->encrypt((int) $fullRangeRands[$index]), $aesEncrypter::class, "encrypt (+sign {$defHashAlgo})");
+    bench(fn (int $index) => $aesEncrypter->decrypt((string) $encryptedIds[$index]), $aesEncrypter::class, "decrypt (+sign {$defHashAlgo})");
 }
 
 if (extension_loaded('sodium')) {
-    $encryptedIds = bench(fn (int $index) => $encrypterChaCha->encrypt((int) $fullRangeRands[$index]), $encrypterChaCha::class, 'encrypt (+sign)');
-    bench(fn (int $index) => $encrypterChaCha->decrypt((string) $encryptedIds[$index]), $encrypterChaCha::class, 'decrypt (+sign)');
-
-    // fast option signer
-    $signedIds = bench(fn (int $index) => $fastSigner->getSignedId((string) $fullRangeRands[$index]), $fastSigner::class, '(siphash + HexSerializer) sign');
-    bench(fn (int $index) => $fastSigner->getIdFromSigned((string) $signedIds[$index]), $fastSigner::class, '(siphash + HexSerializer) verify');
+    $encryptedIds = bench(fn (int $index) => $XChaCha20Encrypter->encrypt((int) $fullRangeRands[$index]), $XChaCha20Encrypter::class, 'encrypt (+sign Poly1305)');
+    bench(fn (int $index) => $XChaCha20Encrypter->decrypt((string) $encryptedIds[$index]), $XChaCha20Encrypter::class, 'decrypt (+sign Poly1305)');
 }
 
 // signers
-$signedIds = bench(fn (int $index) => $signer->getSignedId((string) $fullRangeRands[$index]), $signer::class, '(sha256 + BaseSerializer) sign');
-bench(fn (int $index) => $signer->getIdFromSigned((string) $signedIds[$index]), $signer::class, '(sha256 + BaseSerializer) verify');
+$signedIds = bench(fn (int $index) => $signer->getSignedId((string) $fullRangeRands[$index]), $signer::class, "(BaseSerializer) sign {$defHashAlgo}");
+bench(fn (int $index) => $signer->getIdFromSigned((string) $signedIds[$index]), $signer::class, "(BaseSerializer) verify {$defHashAlgo}");
+
+// hmacs
+if (extension_loaded('sodium') || extension_loaded('flexid_utils')) {
+    $hmac = new Pvmlibs\FlexId\HMAC\SiphashHMAC($key32bit);
+    bench(fn (int $index) => $hmac->sign('some sign message', $fullRangeRands[$index]), $hmac::class, 'sign');
+}
+if (extension_loaded('flexid_utils')) {
+    $hmac = new Pvmlibs\FlexId\HMAC\Blake3HMACFlexIdExt($key32bit);
+    bench(fn (int $index) => $hmac->sign('some sign message', $fullRangeRands[$index]), $hmac::class, 'sign');
+}
+if (extension_loaded('sodium')) {
+    $hmac = new Pvmlibs\FlexId\HMAC\Blake2HMACSodiumExt($key32bit);
+    bench(fn (int $index) => $hmac->sign('some sign message', $fullRangeRands[$index]), $hmac::class, 'sign');
+}
+$hmac = new Pvmlibs\FlexId\HMAC\Sha256HMAC($key32bit);
+bench(fn (int $index) => $hmac->sign('some sign message', $fullRangeRands[$index]), $hmac::class, 'sign');
+
+file_put_contents($reportFile, $resultOutput, FILE_APPEND);

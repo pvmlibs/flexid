@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pvmlibs\FlexId\Signers;
 
+use Pvmlibs\FlexId\Contracts\HMACContract;
 use Pvmlibs\FlexId\Contracts\SerializerContract;
 use Pvmlibs\FlexId\Contracts\SignerContract;
 use Pvmlibs\FlexId\Exceptions\IdBadSignException;
@@ -16,34 +17,23 @@ use Pvmlibs\FlexId\Exceptions\IdVerifySignException;
  */
 class Signer implements SignerContract
 {
-    /**
-     * @var \Closure(string): string
-     */
-    private \Closure $signFn;
-
     private int $signParts;
     private int $signPartMaxLength;
 
     /**
-     * @param string   $secret            Secret key used in MAC. This needs to be treated with high confidentiality, do not
-     *                                    include it in source code. Can use generateKey() method to produce the key. In case of
-     *                                    non-cryptographic algorithms, key is concatenated to id (less secure).
-     *                                    Do not use the same key when encrypting.
-     * @param string   $hashAlgo          hash algorithm, recommended ones in order (for security/speed ratio): siphash-2-4, blake2b, sha256
-     * @param string   $separator         char to separate sign from signed data (or other sign parts), added only when calculated
-     *                                    sign is smaller than maxSignLength
-     * @param int|null $maxSignLength     defines max sign part length. Sign part is 64-bit chunk of encoded data. When null
-     *                                    then it equals max length from serializer.
-     * @param int      $signBits          how many bits in total use for the sign (64, 128, 192, 256), it will be serialized in
-     *                                    parts of 64 bits, optionally separated by separator
-     * @param bool     $onlyPositiveRange optimization for shorter signs, uses 63 from 64 bits of sign part so serializer can work
-     *                                    on positives number only. Better for performance in CustomSerializer.
+     * @param HMACContract $hmac              HMAC algorithm for signing
+     * @param string       $separator         char to separate sign from signed data (or other sign parts), added only when calculated
+     *                                        sign is smaller than maxSignLength
+     * @param int|null     $maxSignLength     defines max sign part length. Sign part is 64-bit chunk of encoded data. When null
+     *                                        then it equals max length from serializer.
+     * @param int          $signBits          how many bits in total use for the sign (64, 128, 192, 256), it will be serialized in
+     *                                        parts of 64 bits, optionally separated by separator
+     * @param bool         $onlyPositiveRange optimization for shorter signs, uses 63 from 64 bits of sign part so serializer can work
+     *                                        on positives number only. Better for performance in CustomSerializer.
      */
     public function __construct(
-        #[\SensitiveParameter]
-        string $secret,
         private SerializerContract $serializer,
-        private string $hashAlgo = 'sha256',
+        private HMACContract $hmac,
         private string $separator = '.',
         ?int $maxSignLength = null,
         private int $signBits = 64,
@@ -53,37 +43,7 @@ class Signer implements SignerContract
             throw new \InvalidArgumentException('Allowed values for signBits are 64, 128, 192, 256');
         }
 
-        $this->signParts = \intdiv($this->signBits, 64);
-
-        $decodedSecret = \base64_decode($secret, true);
-
-        if ($decodedSecret === false || \strlen($decodedSecret) < 16) {
-            throw new \InvalidArgumentException(\sprintf('Secret key is invalid. Ensure it is base64 encoded string and is at least 16 bytes long.'));
-        }
-
-        // sodium extension hashes
-        if ($this->hashAlgo === 'siphash-2-4' || $this->hashAlgo === 'blake2b') {
-            if (extension_loaded('sodium') === false) {
-                throw new \RuntimeException('Sodium extension is not available for ' . $this->hashAlgo);
-            }
-            if ($this->hashAlgo === 'siphash-2-4') {
-                // uses 16 bytes key
-                $this->signFn = fn (string $data) => \sodium_crypto_shorthash($data, $decodedSecret);
-            } else {
-                // uses >= 16 bytes key
-                $this->signFn = fn (string $data) => \sodium_crypto_generichash($data, $decodedSecret);
-            }
-        } // hash core extension hashes
-        elseif (\in_array($this->hashAlgo, \hash_hmac_algos(), true)) {
-            $this->signFn = fn (string $data) => \hash_hmac($this->hashAlgo, $data, $decodedSecret, true);
-        } else {
-            throw new \InvalidArgumentException("{$this->hashAlgo} is not supported");
-        }
-
-        // validate hash with given sign length
-        if (@unpack('J' . $this->signParts, ($this->signFn)('test')) === false) {
-            throw new \InvalidArgumentException("{$this->hashAlgo} cannot produce {$this->signBits} bits");
-        }
+        $this->signParts = $this->signBits >> 6;
 
         if (\strlen($this->separator) !== 1) {
             throw new \InvalidArgumentException('Sign separator must be a single character');
@@ -103,14 +63,8 @@ class Signer implements SignerContract
             }
             $this->signPartMaxLength = $maxSignLength;
         }
-    }
 
-    /**
-     * @param positive-int $bytes
-     */
-    public static function generateSecret(int $bytes = 16): string
-    {
-        return \base64_encode(\random_bytes($bytes));
+        $this->hmac->setup($this->signParts);
     }
 
     public function getSignedId(string $id, string $additionalData = ''): string
@@ -128,19 +82,13 @@ class Signer implements SignerContract
         }
 
         try {
-            $hash = ($this->signFn)($data . $additionalData);
+            $signData = $this->hmac->sign($data . $additionalData);
         } catch (\Exception $e) {
             throw new IdSigningException(message: $e->getMessage(), previous: $e);
         }
 
-        $signData = @unpack('J' . $this->signParts, $hash); // unpack 64 bit chunks
-
-        if ($signData === false) {
-            throw new IdSigningException('Sign hash failed');
-        }
-
         $result = '';
-
+        $parts = 0;
         foreach ($signData as $p) {
             if ($this->onlyPositiveRange) {
                 $p &= 0x7FFFFFFFFFFFFFFF; // ~(1 << 63)
@@ -163,6 +111,10 @@ class Signer implements SignerContract
             }
 
             $result .= $sign;
+            $parts++;
+            if ($parts >= $this->signParts) {
+                break;
+            }
         }
 
         return $result;
@@ -170,6 +122,10 @@ class Signer implements SignerContract
 
     public function getIdFromSigned(string $idWithSign, string $additionalData = ''): string
     {
+        if (\strlen($idWithSign) > 64 * 5) { // 64 max part size, 4 sign parts max + 1 part for id
+            throw new IdVerifySignException('Signed id is too long');
+        }
+
         $signMaxLength = $this->signParts * $this->signPartMaxLength;
         // search for separator (last occurrence)
         $separatorPos = strrpos($idWithSign, $this->separator);

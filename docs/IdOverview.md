@@ -5,7 +5,7 @@
 Overview table presenting generated ID with encoded and encrypted versions, using following configuration:
 ```php
 $resolver = new StaticWorkerResolver(
-    workerHandlerFn: fn() => 0,
+    workerHandlerFn: fn () => 0,
     workersBits: 0,
     sequenceBits: 10,
     workerLockFilePath: null,
@@ -16,8 +16,8 @@ $bench = new IdStats(
     generator: new FlexIdGenerator(workerResolver: $resolver),
     serializer: new CustomSerializer(),
     encrypter: new Sparx64Encrypter(
-        secret: Sparx64Encrypter::generateSecret(),
-        serializer: new BaseSerializer()
+        base64secret: KeyGen::generate(),
+        serializer: new BaseSerializer(),
     ),
 );
 
@@ -85,19 +85,12 @@ Serializer                      |                      HexSerializer|     BaseSe
 Example for ID 57439            |     a373a8769ac449dc.dyfVqCfMBDDjM|     vcQBKVmZjwXvw.XdKKWDqdgCDVw| GKhbxTVHdcD7.wqzpYfBjvLQwQ |
 Example for ID 44275863723996160|     0c45becd8ba9c5f8.qXGzFwCZLWZQk|     dxkjCfMJgwqgC.YJfKcGkcCXzm| h4b3RFmNS3jx.fCJZvjdWQKfzx |
 
-Encrypting ID (AesEncrypter + Signer 64bit):
+Encrypting ID (AesEncrypter + Signer 64bit, the same format also for Sparx128Encrypter):
 
 Serializer                      |                      HexSerializer|   BaseSerializer|                   CustomSerializer|
 --------------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
 Example for ID 57439            |   6195aa4314f6e611cc9a13083a6fbd3e|   JCZMwJjqVQwCPjwvYpRzBjYLjg|           XVzP65DQrVf3QD66zbvTSXpx|
 Example for ID 44275863723996160|   587d3a108ac92a64988cfcf0b6232e3f|   WkyFDWwbGwbVxCwMDLqLwyWLzx|            39WWQSFNdkX.dvnpTG4bk2s|
-
-No serializer, build-in encoder
-
-Serializer                      |                        hex encoder|
---------------------------------|-----------------------------------|
-Example for ID 57439            |   6195aa4314f6e611cc9a13083a6fbd3e|
-Example for ID 44275863723996160|   587d3a108ac92a64988cfcf0b6232e3f|
 
 
 Encrypting ID (XChaCha20Encrypter - embedded signing with Poly1305, no custom serializer):

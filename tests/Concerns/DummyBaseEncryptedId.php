@@ -7,6 +7,7 @@ namespace Tests\Concerns;
 use Pvmlibs\FlexId\Concerns\HasIdHandler;
 use Pvmlibs\FlexId\Contracts\IdHandlerContract;
 use Pvmlibs\FlexId\Encrypters\Sparx64Encrypter;
+use Pvmlibs\FlexId\HMAC\Sha256HMAC;
 use Pvmlibs\FlexId\IdHandlers\EncryptedId;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
@@ -25,13 +26,10 @@ abstract class DummyBaseEncryptedId
         static $class = null;
         $class ??= [
             new EncryptedId(
-                new Sparx64Encrypter(
-                    'TKXoZyARtcsFzsyQTrfOQw==',
-                    new BaseSerializer(),
-                ),
+                new Sparx64Encrypter('TKXoZyARtcsFzsyQTrfOQw==', new BaseSerializer()),
                 new Signer(
-                    'rCl29//aZ51LjLQZKUbMUA==',
                     new BaseSerializer(),
+                    new Sha256HMAC(\Pvmlibs\FlexId\Tools\KeyGen::generate()),
                 ),
             ),
         ];

@@ -53,9 +53,11 @@ class ApcuTimestepWorkerResolver implements WorkerResolverContract
         public readonly int $timestampBitshift = 0,
         public readonly int $timestampOffset = 1735689600, // UTC 2025-01-01
     ) {
+        // @codeCoverageIgnoreStart
         if (\apcu_enabled() === false) {
             throw new IdConfigurationException('This resolver requires APCu extension');
         }
+        // @codeCoverageIgnoreEnd
 
         $this->configuration = new IdConfiguration(
             workersBits: $this->workersBits,

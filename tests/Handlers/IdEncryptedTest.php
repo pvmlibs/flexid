@@ -12,9 +12,11 @@ use Pvmlibs\FlexId\Exceptions\IdBadSignException;
 use Pvmlibs\FlexId\Exceptions\IdDecodeException;
 use Pvmlibs\FlexId\Exceptions\IdDecryptException;
 use Pvmlibs\FlexId\FlexIdGenerator;
+use Pvmlibs\FlexId\HMAC\Sha256HMAC;
 use Pvmlibs\FlexId\IdHandlers\EncryptedId;
 use Pvmlibs\FlexId\Serializers\BaseSerializer;
 use Pvmlibs\FlexId\Signers\Signer;
+use Pvmlibs\FlexId\Tools\KeyGen;
 use Tests\Internal\TestingWorkerResolver;
 
 /**
@@ -30,10 +32,12 @@ final class IdEncryptedTest extends TestCase
         $workerResolver->setWorker(fn () => 1);
 
         $encrypter = new Sparx64Encrypter(
-            secret: Sparx64Encrypter::generateSecret(),
+            base64secret: KeyGen::generate(),
             serializer: new BaseSerializer(),
         );
-        $signer = new Signer('PsQBSNyMoz60RpQnSKWBMg==', new BaseSerializer());
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $signer = new Signer(new BaseSerializer(), $hmac);
 
         $encryptedId = new EncryptedId(
             encrypter: $encrypter,
@@ -62,7 +66,7 @@ final class IdEncryptedTest extends TestCase
         $workerResolver->setWorker(fn () => 1);
 
         $encrypter = new Sparx64Encrypter(
-            secret: Sparx64Encrypter::generateSecret(),
+            base64secret: KeyGen::generate(),
             serializer: new BaseSerializer(),
         );
 
@@ -84,7 +88,7 @@ final class IdEncryptedTest extends TestCase
         $workerResolver->setWorker(fn () => 1);
 
         $encrypter = new XChaCha20Encrypter(
-            secret: XChaCha20Encrypter::generateSecret(),
+            base64secret: KeyGen::generate(),
         );
 
         $encryptedId = new EncryptedId(
@@ -102,7 +106,7 @@ final class IdEncryptedTest extends TestCase
         $workerResolver->setWorker(fn () => 1);
 
         $encrypter = new XChaCha20Encrypter(
-            secret: XChaCha20Encrypter::generateSecret(),
+            base64secret: KeyGen::generate(),
         );
 
         $encryptedId = new EncryptedId(
@@ -124,8 +128,12 @@ final class IdEncryptedTest extends TestCase
         $workerResolver = new TestingWorkerResolver();
         $workerResolver->setWorker(fn () => 1);
 
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
         $encrypter = new AesEncrypter(
-            secret: AesEncrypter::generateSecret(),
+            base64secret: $key,
+            hmac: $hmac,
+            serializer: new BaseSerializer(),
         );
 
         $encryptedId = new EncryptedId(

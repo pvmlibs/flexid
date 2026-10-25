@@ -17,7 +17,7 @@ class HexSerializer implements SerializerContract
 
     public function serialize(int $data): string
     {
-        return \bin2hex(\pack('J', $data));
+        return \bin2hex(\pack('Q', $data));
     }
 
     public function deserialize(string $data): int
@@ -33,7 +33,7 @@ class HexSerializer implements SerializerContract
             throw new IdDecodeException('Failed to convert string id to binary format');
         }
 
-        $unpacked = @unpack('J', $number);
+        $unpacked = @unpack('Q', $number);
 
         if ($unpacked === false) {
             throw new IdDecodeException('Cannot unpack hex string to 4 unsigned shorts');

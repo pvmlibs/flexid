@@ -5,19 +5,21 @@
 
 Features:
 - Generate unique ID on one or multiple nodes/processes. Workers management is included for efficient ID pool usage
+- generated ID lifespan ranges from 292 to 292271 years
 - Encode integer ID for shorter strings/obfuscate it with custom alphabet e.g. xzRYLSKxJH
 - Encrypt integer ID when need to publish it and want to safely hide the real value
-- Sign ID for integrity and authenticity, preventing tampering, enumeration and misuse (so user id cannot be used as invoice id)
-- generated ID lifespan ranges from 292 to 292271 years
+- Sign ID for integrity and authenticity, preventing tampering, enumeration and misuse (so e.g. user id cannot be used as invoice id)
+- generate short, unpredictable strings from id
 - superfast, see [Benchmarks](docs/Benchmarks.md)
 - example integration with [Laravel](docs/LaravelIntegration.md)
 
 Included tools (serializers, encrypters, signers) can also work with external ID, including ordinary autoincrement ID.
-They try to solve common problem with exposing internal ID from database to public. Usually applications use something
-like uuidv4/uuidv7/other random id which have impact on DB performance, memory usage and could also reveal information
-on id creation date (uuidv7).
+They try to solve common problem with exposing internal ID from database with public interfaces. Usually applications
+use something like uuidv4/uuidv7/other random id which have impact on DB performance, memory usage and could also reveal
+information on id creation date (uuidv7).
 Now we can have performant integer ID in database and transform it to/from application on the fly, without storing
-transformed id.
+transformed id and have additional protection for e.g. insecure direct object reference (IDOR) vulnerabilities.
+When id are signed, we can validate them even before hitting database.
 
 ## Requirements
 
@@ -28,7 +30,7 @@ sign on vanilla php, required are only:
 2. PHP >= 8.1
 
 Some of additional features like some of encryptors, faster hashes, specialized worker resolvers requires additional
-extensions.
+extensions. For superior performance with encryptors and serializers use [flexid_utils]() extension.
 
 ## Installation
 
@@ -50,7 +52,9 @@ composer require pvmlibs/flexid
 3. Encryptors - encrypts/decrypts ID. Encrypted ID have to use serializer for printable output.
    - Sparx64Encrypter - uses Sparx lightweight ARX-based 64-bit block cipher that can transform ID to other 64-bit number
                         with 128-bit key. No php extensions required. For the same input, will give the same (permutated) output.
-   - AesEncrypter - uses AES with 128, 192 or 256-bit key. Block size is 128-bit so first 64 bits takes id, the second
+   - Sparx128Encrypter - uses Sparx with 256-bit key. Block size is 128-bit so first 64 bits takes id, the second
+                        one is used for HMAC sign. For the same input, will give the same (permutated) output.
+   - AesEncrypter - uses AES with 256-bit key. Block size is 128-bit so first 64 bits takes id, the second
                     one is used for HMAC sign. For the same input, will give the same (permutated) output.
                     Requires openssl extension. 
    - XChaCha20Encrypter - stream cipher with 256-bit key, 128-bit sign and 192-bit nonce so the same input generates
@@ -67,14 +71,17 @@ composer require pvmlibs/flexid
                           while still being short.
      - HexSerializer - uses only hexadecimal chars, but it's fast. Fixed length (16).
      - Base64Serializer - uses a-zA-z0-9-_ chars, fast but can create random words. Fixed length (11).
-5. Signers - sign ID using HMAC with secret key. It can ensure that ID comes from us and was not changed (confidence
+5. HMACS - keyed hashes using for signing id.
+7. Ciphers - ciphers (AesCipher, Sparx64/128Cipher that translates number to number). Can be also used when you want to
+    operate only on numbers.
+6. Signers - sign ID using HMAC with secret key. It can ensure that ID comes from us and was not changed (confidence
       depends mainly on sign length). Uses serializer for producing printable output. 
      - Signer - customizable signer, by default uses 64 bit of hash data (customizable up to 256 bit), length can be
-            also reduced up to 1 char, depending on application needs (e.g. for simple id checksum). Out of the box does
-            not require any php extensions, but some of the hash options may require sodium (siphash-2-4 or blake2b
-            are recommended). Keep in mind that 64 bits are tradeoff between id integrity confidence and output length,
-            generally application should always validate incoming id anyway. If you need to relay on authenticity then
-            64 bits are probably to little, and you should consider 128-256 bit signs.
+            also reduced up to 1 char, depending on application needs (e.g. for simple id checksum). Keep in mind that
+            64 bits are tradeoff between id integrity confidence and output length, generally application should always
+            validate incoming id anyway. If you need to relay on authenticity then 64 bits are probably to little,
+            and you should consider 128-256 bit signs.
+
 
 
 ## Usage
@@ -86,7 +93,7 @@ ID handling is part of application design, you need to evaluate what the applica
   you want as short output as possible, while still hiding real id, you can use HashSerializer.
 - autoincrement id/timestamp based id choose. Timestamp based won't produce as short output as autoincrement id but can
   be globally unique.
-- id signing does not replace proper authentication for resource access, it can act as additional layer
+- id encrypting/signing **does not** replace proper authentication for resource access, it can act as additional layer
 
 Parameters that should be constant through application lifetime to prevent ID overlapping and decoding issues:
 - timestamp offset
@@ -94,6 +101,7 @@ Parameters that should be constant through application lifetime to prevent ID ov
 - serializer parameters (if used) including used alphabet
 - encrypter parameters (if used) including used alphabet and secret key
 - signer settings
+- hmac algorithm
 
 Other parameters like worker bits, sequence bits, group bits are pretty safe to manipulate in future - collision can 
 happen only within the same timestep (max 1,07s) when concurrently using different parameters. If you want to
@@ -131,96 +139,58 @@ Generate many ID more efficiently:
 ```php
 $ids = $generator->bulkIds(1000); // array
 ```
-
-Generate ID with encoding. Serializer can be also used to encode/decode any integer number (PHP_INT_MIN - PHP_INT_MAX):
+Obfuscate id to short string (similar to sqids):
 
 ```php
-$generator = new \Pvmlibs\FlexId\FlexIdGenerator(
-    workerResolver: new \Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver(client: $redisClient)
-);
-
+// this hides id as best effort to get minimal output, but cannot compete with encryption.
 $serializer = new \Pvmlibs\FlexId\Serializers\HashSerializer();
-
-// using helper container
-$encodedId = new \Pvmlibs\FlexId\IdHandlers\EncodedId(
-   serializer: $serializer,
-   // signer: use SignerContract if id should be also signed
-   generator: $generator, // optional, if you want to generate id
-);
-
-$id = $encodedId->generateId(); // 43581127276918784
-$publicId = $encodedId->toPublicId($id); // LNvqjBKLnJ
-$encodedId->fromPublicId($publicId); // 43581127276918784
-
-// or use serializer directly
-$id = $generator->id(); // 43581127276918784
-$publicId = $serializer->serialize($id); // LNvqjBKLnJ
-$serializer->serialize($publicId); // 43581127276918784
-$serializer->serialize(12345); // fF96
+$serializer->serialize(123456); // ZMqf
 ```
 
-Generate ID with encrypting. Encryptor can be also used to encrypt/decrypt any integer number (PHP_INT_MIN - PHP_INT_MAX):
+Encrypting ID:
 
 ```php
 $generator = new \Pvmlibs\FlexId\FlexIdGenerator(
     workerResolver: new \Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver(client: $redisClient)
 );
-$secret = \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter::generateSecret(); // use your own secret
+$secret = \Pvmlibs\FlexId\Tools\KeyGen::generate(); // generates 32-bit key
+
+// 64-bit encrypter, 128-bit key. Short output but no sign here, you can use addi
 $encrypter = new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
-    secret: $secret,
+    base64secret: $secret,
     serializer: new \Pvmlibs\FlexId\Serializers\BaseSerializer()
 );
-
-// using helper container
-$encryptedId = new \Pvmlibs\FlexId\IdHandlers\EncryptedId(
-    encrypter: $encrypter,
-    // signer: use SignerContract if id should be also signed
-    generator: $generator, // optional, if you want to generate id
-);
-
-$id = $encryptedId->generateId(); // 43581127276918784
-$publicId = $encryptedId->toPublicId($id); // yVyKqbkQDgYgR
-$encryptedId->fromPublicId($publicId); // 43581127276918784
-
-// or use encryptor directly
-$id = $generator->id(); // 43581127276918784
-$publicId = $encrypter->encrypt($id); // yVyKqbkQDgYgR
+$publicId = $encrypter->encrypt(43581127276918784); // yVyKqbkQDgYgR
 $encrypter->decrypt($publicId); // 43581127276918784
+
+// 128-bit block encrypters have already build-in sign (MAC-then-encrypt), so no need to use Signer (unless you want to have additional Encrypt-then-MAC)
+$encrypter = new \Pvmlibs\FlexId\Encrypters\Sparx128Encrypter(
+    base64secret: $secret,
+    hmac: new \Pvmlibs\FlexId\HMAC\SiphashHMAC($secret), // we can pass the same key here - it will use hkdf
+    serializer: new \Pvmlibs\FlexId\Serializers\BaseSerializer()
+);
+$publicId = $encrypter->encrypt($id); // dZRKYwQpWJyfgJRgZFyfVyFxYd
+
+// for best performance, high security and quite short output use Sparx128TurboEncrypter - requires flexid_utils extension
+// By default it uses Alphabets::CUSTOM_SEMI_SAFE, minimal length where you can produce up to 22 characters output.
+// See Alphabets class for more information about different alphabets.
+$encrypterTurbo = new \Pvmlibs\FlexId\Encrypters\Sparx128TurboEncrypter(base64secret: $secret);
+$encrypterTurbo->encrypt(123456); // zLF5bd5P42sppyEyVgGsi9
+
 ```
 
-Sign ID directly. Signer can be also used to encrypt/decrypt any ID (as string):
+Sign ID directly. Signer can be also used to sign any ID (as string):
 
 ```php
-// use signer as id crc, 1 char sign
+// you can adjust sign length from 1 character up to 256 bits, by default it's 64 bits.
 $signer = new \Pvmlibs\FlexId\Signers\Signer(
-    secret: \Pvmlibs\FlexId\Signers\Signer::generateSecret(), // use your own key
-    serializer: new \Pvmlibs\FlexId\Serializers\CustomSerializer(),
-    hashAlgo: 'siphash-2-4', // siphash is few times faster than sha256
-    maxSignLength: 1,
-    onlyPositiveRange: true // optionally for short signs, much faster when using with CustomSerializer
-);
-
-$id = 'r8BnZxS';
-$signed = $signer->getSignedId($id); // r8BnZxSQ
-// get id from signed with validation
-$id = $signer->getIdFromSigned($signed); // r8BnZxS
-
-// for more integrity assurance use longer sign length (signBits). For shorter output and less assurance adjust maxSignLength.
-$signer = new \Pvmlibs\FlexId\Signers\Signer(
-    secret: \Pvmlibs\FlexId\Signers\Signer::generateSecret(), // use your own key
     serializer: new \Pvmlibs\FlexId\Serializers\BaseSerializer(),
-    hashAlgo: 'siphash-2-4',
-    signBits: 64,
+    hmac: new \Pvmlibs\FlexId\HMAC\SiphashHMAC(\Pvmlibs\FlexId\Tools\KeyGen::generate()),
 );
 
 $id = 'r8BnZxS';
 $signed = $signer->getSignedId($id); // r8BnZxSDwJgwJWVxfJdx
 
-// other examples of signed id
-// encrypted id + default 64-bit sign
-// r8BnZxSqxFfPZYcLLYzQ
-// encrypted id + 128-bit sign
-// r8BnZxSqxFfPZYcLLYzQJZMcRWcLqmvLD
 ```
 
 Building ID Value Object (see also [Laravel Integration](docs/LaravelIntegration.md)):

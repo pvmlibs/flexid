@@ -1,0 +1,90 @@
+PHP: 80511, opcache: OFF, jit: OFF, Extensions: sodium, bcmath, gmp, openssl
+
+Encode 100 ids
+CustomSerializer encode                                     0.056 ms
+BaseSerializer encode                                       0.046 ms
+HashSerializer encode                                       0.074 ms
+HexSerializer encode                                        0.012 ms
+Base64Serializer encode                                     0.021 ms
+
+Encrypt + sign 100 ids
+Sparx64Encrypter 128-bit key, 64-bit sign siphash-2-4       0.461 ms
+Sparx128Encrypter 256-bit key, 64-bit sign siphash-2-4      1.387 ms
+AesEncrypter 256-bit key, 64-bit sign siphash-2-4           1.059 ms
+XChaCha20Encrypter 256-bit key, 128-bit sign Poly1305       0.097 ms
+
+Test with 10k operations:
+FlexIdGenerator with StaticWorkerResolver         3,886,857 ops/s
+FlexIdGenerator with RandomWorkerResolver         2,044,875 ops/s
+BaseSerializer serialize                          2,281,335 ops/s
+BaseSerializer deserialize                        1,857,198 ops/s
+CustomSerializer serialize                        1,192,969 ops/s
+CustomSerializer deserialize                      1,238,519 ops/s
+HashSerializer serialize                          1,373,244 ops/s
+HashSerializer deserialize                        1,206,047 ops/s
+HexSerializer serialize                           8,650,063 ops/s
+HexSerializer deserialize                         6,617,783 ops/s
+Base64Serializer serialize                        4,974,377 ops/s
+Base64Serializer deserialize                      4,630,952 ops/s
+Sparx64Encrypter encrypt                          266,153 ops/s
+Sparx64Encrypter decrypt                          276,005 ops/s
+Sparx64Encrypter encrypt (+sign siphash-2-4)      224,228 ops/s
+Sparx64Encrypter decrypt (+sign siphash-2-4)      202,730 ops/s
+Sparx128Encrypter encrypt (+sign siphash-2-4)     73,341 ops/s
+Sparx128Encrypter decrypt (+sign siphash-2-4)     69,429 ops/s
+AesEncrypter encrypt (+sign siphash-2-4)          396,785 ops/s
+AesEncrypter decrypt (+sign siphash-2-4)          343,661 ops/s
+XChaCha20Encrypter encrypt (+sign Poly1305)       1,118,237 ops/s
+XChaCha20Encrypter decrypt (+sign Poly1305)       1,168,914 ops/s
+Signer (BaseSerializer) sign siphash-2-4          1,179,875 ops/s
+Signer (BaseSerializer) verify siphash-2-4        1,028,585 ops/s
+SiphashHMAC sign                                  3,496,216 ops/s
+Blake2HMACSodiumExt sign                          1,658,564 ops/s
+Sha256HMAC sign                                   955,882 ops/s
+PHP: 80511, opcache: OFF, jit: OFF, Extensions: sodium, bcmath, gmp, openssl, flexid_utils
+
+Encode 100 ids
+CustomSerializer encode                                     0.017 ms
+BaseSerializer encode                                       0.013 ms
+HashSerializer encode                                       0.018 ms
+HexSerializer encode                                        0.020 ms
+Base64Serializer encode                                     0.030 ms
+
+Encrypt + sign 100 ids
+Sparx64Encrypter 128-bit key, 64-bit sign siphash-2-4       0.076 ms
+Sparx128Encrypter 256-bit key, 64-bit sign siphash-2-4      0.078 ms
+Sparx128TurboEncrypter 256-bit key, 64-bit sign siphash-2-4 0.041 ms
+AesEncrypter 256-bit key, 64-bit sign siphash-2-4           0.982 ms
+XChaCha20Encrypter 256-bit key, 128-bit sign Poly1305       0.108 ms
+
+Test with 10k operations:
+FlexIdGenerator with StaticWorkerResolver         3,841,470 ops/s
+FlexIdGenerator with RandomWorkerResolver         2,069,518 ops/s
+BaseSerializer serialize                          8,539,571 ops/s
+BaseSerializer deserialize                        9,740,921 ops/s
+CustomSerializer serialize                        7,806,913 ops/s
+CustomSerializer deserialize                      9,482,547 ops/s
+HashSerializer serialize                          7,189,207 ops/s
+HashSerializer deserialize                        7,467,000 ops/s
+HexSerializer serialize                           9,000,770 ops/s
+HexSerializer deserialize                         6,645,627 ops/s
+Base64Serializer serialize                        5,040,752 ops/s
+Base64Serializer deserialize                      4,639,217 ops/s
+Sparx64Encrypter encrypt                          4,109,578 ops/s
+Sparx64Encrypter decrypt                          3,868,147 ops/s
+Sparx64Encrypter encrypt (+sign siphash-2-4)      1,805,224 ops/s
+Sparx64Encrypter decrypt (+sign siphash-2-4)      1,364,310 ops/s
+Sparx128Encrypter encrypt (+sign siphash-2-4)     1,554,157 ops/s
+Sparx128Encrypter decrypt (+sign siphash-2-4)     1,291,823 ops/s
+Sparx128TurboEncrypter encrypt (+sign siphash-2-4)2,551,154 ops/s
+Sparx128TurboEncrypter decrypt (+sign siphash-2-4)2,047,085 ops/s
+AesEncrypter encrypt (+sign siphash-2-4)          614,444 ops/s
+AesEncrypter decrypt (+sign siphash-2-4)          599,390 ops/s
+XChaCha20Encrypter encrypt (+sign Poly1305)       1,121,703 ops/s
+XChaCha20Encrypter decrypt (+sign Poly1305)       1,178,012 ops/s
+Signer (BaseSerializer) sign siphash-2-4          2,732,829 ops/s
+Signer (BaseSerializer) verify siphash-2-4        1,978,418 ops/s
+SiphashHMAC sign                                  7,048,826 ops/s
+Blake3HMACFlexIdExt sign                          4,960,581 ops/s
+Blake2HMACSodiumExt sign                          1,657,179 ops/s
+Sha256HMAC sign                                   959,910 ops/s
