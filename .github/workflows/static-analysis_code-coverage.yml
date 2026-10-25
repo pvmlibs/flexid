@@ -35,10 +35,14 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: 8.1
-          tools: composer:v2
+          tools: composer:v2, pie
           coverage: pcov
-          extensions: redis, pcntl, apcu, bcmath, openssl, pvmlibs/flexid_utils
+          extensions: redis, pcntl, apcu, bcmath, openssl
           ini-values: apc.enabled=1, apc.enable_cli=1
+
+      - name: Install flexid_utils
+        run: |
+          pie install --no-interaction pvmlibs/flexid_utils
 
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
