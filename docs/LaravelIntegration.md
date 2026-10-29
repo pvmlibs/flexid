@@ -11,6 +11,7 @@ ID Value Objects also assure assigning correct id type in models and are helpful
 return [
     'secret_key' => env('ID_SECRET_KEY'), // generate KeyGen::generate(), can be used for encryption and signing
     'alphabet' => env('ID_ALPHABET'), // shuffled alphabet, especially important when encoding with HashSerializer
+    'hkdf_salt' => env('ID_SALT_HKDF') // generate e.g. with KeyGen::generate(), optional for even more security with *HMAC classes
 ]
 ```
 
@@ -36,7 +37,9 @@ abstract class EncryptedIdAbstract implements Castable, \JsonSerializable
         static $class = null; // resolve only once
         $class ??= [
             // You can add more classes for e.g. key rotation scenario, it will try from the first one
-            // example for encoding and short sign for concise output (here 8 chars)
+            // However when key or configuration will change, all stored id on 3rd party will be invalid.
+            // Example for encoding and short sign for concise output (here 8 chars). Note that HashSerializer
+            // will produce short output if id is also short, so timestamp-based id will be longer.
 //            new EncodedId(
 //                new HashSerializer(alphabet: config('id.alphabet'), minLength: 4),
 //                new Signer(
@@ -47,7 +50,8 @@ abstract class EncryptedIdAbstract implements Castable, \JsonSerializable
 //                ),
 //                null, // here you can optionally pass IdGeneratorContract if you want to generate id from app
 //            ),            
-            // example for encrypted (64-bit block, 128-bit key) and signed id (64-bit) for better confidentiality (but longer output, here ~26 chars)
+            // Example for encrypted (64-bit block, 128-bit key) and signed id (64-bit) for better confidentiality (but longer output, here ~26 chars)
+            // Use also CustomSerializer for possibly shorter and safe outputs (requires BcMath, GMP or Flexid_utils extension).
             new EncryptedId(
                 new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(config('id.secret_key'), new BaseSerializer()),
                 new Signer( // optional but recommended, we can use the same key, sign will use hkdf key derivation
@@ -56,10 +60,14 @@ abstract class EncryptedIdAbstract implements Castable, \JsonSerializable
                 ),
                 null, // here you can optionally pass IdGeneratorContract if you want to generate id from app
             ),
-            // example for encryption (128-bit block, 256-bit key) with build-in sign (64 bit) (~26 chars)
-            // use Sparx128TurboEncrypter if possible
+            // Example for encryption (128-bit block, 256-bit key) with build-in sign (64 bit) (~26 chars).
+            // Ese Sparx128TurboEncrypter if possible.
             new EncryptedId(
-                new \Pvmlibs\FlexId\Encrypters\Sparx128Encrypter(config('id.secret_key'), new BaseSerializer()),
+                new \Pvmlibs\FlexId\Encrypters\Sparx128Encrypter(
+                    base64secret: config('id.secret_key'),
+                    hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC(config('id.secret_key')), // use SiphashHMAC for better performance
+                    serializer: new BaseSerializer(),
+                );
                 null, // id have already a sign, but you can add additional sign
                 null, // here you can optionally pass IdGeneratorContract if you want to generate id from app
             ),            

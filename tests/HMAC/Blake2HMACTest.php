@@ -38,4 +38,19 @@ class Blake2HMACTest extends TestCase
         $this::expectException(\InvalidArgumentException::class);
         new Blake2HMACSodiumExt($key);
     }
+
+    public function testWrongSalt(): void
+    {
+        $this::expectException(\InvalidArgumentException::class);
+        new Blake2HMACSodiumExt(base64EncodedKey: KeyGen::generate(), hkdfSalt: 'dfhdg');
+    }
+
+    public function testWithSalt(): void
+    {
+        $key = KeyGen::generate();
+        $hash = new Blake2HMACSodiumExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+        $hash2 = new Blake2HMACSodiumExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+
+        $this::assertNotSame($hash->sign('foo'), $hash2->sign('foo'));
+    }
 }

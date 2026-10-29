@@ -38,4 +38,19 @@ class ShaHMACTest extends TestCase
         $this::expectException(\InvalidArgumentException::class);
         new Sha256HMAC($key);
     }
+
+    public function testWrongSalt(): void
+    {
+        $this::expectException(\InvalidArgumentException::class);
+        new Sha256HMAC(base64EncodedKey: KeyGen::generate(), hkdfSalt: 'dfhdg');
+    }
+
+    public function testWithSalt(): void
+    {
+        $key = KeyGen::generate();
+        $hash = new Sha256HMAC(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+        $hash2 = new Sha256HMAC(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+
+        $this::assertNotSame($hash->sign('foo'), $hash2->sign('foo'));
+    }
 }

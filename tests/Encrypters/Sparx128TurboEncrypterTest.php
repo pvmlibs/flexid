@@ -131,6 +131,21 @@ final class Sparx128TurboEncrypterTest extends TestCase
         new Sparx128TurboEncrypter(base64secret: 'asfdsd');
     }
 
+    public function testWrongSalt(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new Sparx128TurboEncrypter(base64secret: KeyGen::generate(), hkdfSalt: 'dfhdg');
+    }
+
+    public function testWithSalt(): void
+    {
+        $key = KeyGen::generate();
+        $encrypter = new Sparx128TurboEncrypter(base64secret: $key, hkdfSalt: KeyGen::generate());
+        $encrypter2 = new Sparx128TurboEncrypter(base64secret: $key, hkdfSalt: KeyGen::generate());
+
+        $this::assertNotSame($encrypter->encrypt(123456), $encrypter2->encrypt(123456));
+    }
+
     public function testInteroperabilityCustomSerializer(): void
     {
         $key = 'HtPA2DA8cy2gRUC4h+tKnKIjUt5xuLJzkmKc3MtwZpc=';

@@ -11,8 +11,13 @@ class SiphashHMACSodiumExt implements HMACContract
 {
     private string $key;
 
-    public function __construct(#[\SensitiveParameter] string $base64EncodedKey, string $hkdfInfo = 'siphash mac')
-    {
+    public function __construct(
+        #[\SensitiveParameter]
+        string $base64EncodedKey,
+        string $hkdfInfo = 'siphash mac',
+        #[\SensitiveParameter]
+        string $hkdfSalt = '',
+    ) {
         // @codeCoverageIgnoreStart
         if (\extension_loaded('sodium') === false) {
             throw new \RuntimeException('Flexid extension is not available');
@@ -24,7 +29,12 @@ class SiphashHMACSodiumExt implements HMACContract
         if ($decodedKey === false || \strlen($decodedKey) < 16) {
             throw new \InvalidArgumentException(\sprintf('Secret key is invalid. Ensure it is base64 encoded string and is at least 16 bytes long.'));
         }
-        $this->key = \hash_hkdf('sha3-256', $decodedKey, 16, $hkdfInfo);
+        $decodedSalt = \base64_decode($hkdfSalt, true);
+
+        if ($decodedSalt === false) {
+            throw new \InvalidArgumentException(\sprintf('Salt must be base64 encoded'));
+        }
+        $this->key = \hash_hkdf('sha3-256', $decodedKey, 16, $hkdfInfo, $decodedSalt);
     }
 
     public function setup(int $output64bitWords): void

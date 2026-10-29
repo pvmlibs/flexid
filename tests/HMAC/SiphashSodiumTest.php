@@ -33,4 +33,19 @@ class SiphashSodiumTest extends TestCase
         $this::expectException(\InvalidArgumentException::class);
         new SiphashHMACSodiumExt($key);
     }
+
+    public function testWrongSalt(): void
+    {
+        $this::expectException(\InvalidArgumentException::class);
+        new SiphashHMACSodiumExt(base64EncodedKey: KeyGen::generate(), hkdfSalt: 'dfhdg');
+    }
+
+    public function testWithSalt(): void
+    {
+        $key = KeyGen::generate();
+        $hash = new SiphashHMACSodiumExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+        $hash2 = new SiphashHMACSodiumExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+
+        $this::assertNotSame($hash->sign('foo'), $hash2->sign('foo'));
+    }
 }

@@ -12,8 +12,13 @@ class Blake2HMACSodiumExt implements HMACContract
     private string $key;
     private string $unpackFormat = 'Q';
 
-    public function __construct(#[\SensitiveParameter] string $base64EncodedKey, string $hkdfInfo = 'blake2 mac')
-    {
+    public function __construct(
+        #[\SensitiveParameter]
+        string $base64EncodedKey,
+        string $hkdfInfo = 'blake2 mac',
+        #[\SensitiveParameter]
+        string $hkdfSalt = '',
+    ) {
         // @codeCoverageIgnoreStart
         if (\extension_loaded('sodium') === false) {
             throw new \RuntimeException('Flexid extension is not available');
@@ -25,7 +30,12 @@ class Blake2HMACSodiumExt implements HMACContract
         if ($decodedKey === false || \strlen($decodedKey) < 32) {
             throw new \InvalidArgumentException(\sprintf('Secret key is invalid. Ensure it is base64 encoded string and is at least 32 bytes long.'));
         }
-        $this->key = \hash_hkdf('sha3-256', $decodedKey, 32, $hkdfInfo);
+        $decodedSalt = \base64_decode($hkdfSalt, true);
+
+        if ($decodedSalt === false) {
+            throw new \InvalidArgumentException(\sprintf('Salt must be base64 encoded'));
+        }
+        $this->key = \hash_hkdf('sha3-256', $decodedKey, 32, $hkdfInfo, $decodedSalt);
     }
 
     public function setup(int $output64bitWords): void

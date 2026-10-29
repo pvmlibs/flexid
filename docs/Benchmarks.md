@@ -61,6 +61,8 @@ Blake3HMACFlexIdExt sign                         | -                        |4,8
 Blake2HMACSodiumExt sign                         | 1,608,516 ops/s          |1,661,030 ops/s
 Sha256HMAC sign                                  | 929,034 ops/s            |952,938 ops/s
 
+See also [raw dumps](../src/Scripts/RefPerf/perf6.0.txt)
+
 For comparison Sqids package (functionally similar to HashSerializer - short, random-looking id):
 
 Test with 10k operations:| ops/s

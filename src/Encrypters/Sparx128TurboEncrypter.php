@@ -25,6 +25,7 @@ class Sparx128TurboEncrypter implements EncrypterWithMacContract
      * @param string $signHkdfInfo info message for HKDF
      * @param string $alphabet     alphabet for serializing data
      * @param string $separator    character used to separate two 64-bit parts of serialized data. It is used only when necessary.
+     * @param string $hkdfSalt     base64 encoded salt for HKDF
      *
      * @throws \InvalidArgumentException
      */
@@ -34,6 +35,8 @@ class Sparx128TurboEncrypter implements EncrypterWithMacContract
         string $signHkdfInfo = 'siphash mac',
         string $alphabet = Alphabets::CUSTOM_SEMI_SAFE,
         string $separator = '.',
+        #[\SensitiveParameter]
+        string $hkdfSalt = '',
     ) {
         // @codeCoverageIgnoreStart
         if (\extension_loaded('flexid_utils') === false) {
@@ -46,7 +49,12 @@ class Sparx128TurboEncrypter implements EncrypterWithMacContract
         if ($decodedSecret === false || \strlen($decodedSecret) !== 32) {
             throw new \InvalidArgumentException(\sprintf('Secret key must be 32 bytes long'));
         }
-        $derivedKey = \hash_hkdf('sha3-256', $decodedSecret, 16, $signHkdfInfo);
+        $decodedSalt = \base64_decode($hkdfSalt, true);
+
+        if ($decodedSalt === false) {
+            throw new \InvalidArgumentException(\sprintf('Salt must be base64 encoded'));
+        }
+        $derivedKey = \hash_hkdf('sha3-256', $decodedSecret, 16, $signHkdfInfo, $decodedSalt);
 
         try {
             $this->cipher = new \FlexId\Sparx128($decodedSecret);

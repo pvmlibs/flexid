@@ -108,4 +108,19 @@ class SiphashFlexIdExtTest extends TestCase
         $this::expectException(\InvalidArgumentException::class);
         new SiphashHMACFlexIdExt($key);
     }
+
+    public function testWrongSalt(): void
+    {
+        $this::expectException(\InvalidArgumentException::class);
+        new SiphashHMACFlexIdExt(base64EncodedKey: KeyGen::generate(), hkdfSalt: 'dfhdg');
+    }
+
+    public function testWithSalt(): void
+    {
+        $key = KeyGen::generate();
+        $hash = new SiphashHMACFlexIdExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+        $hash2 = new SiphashHMACFlexIdExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+
+        $this::assertNotSame($hash->sign('foo'), $hash2->sign('foo'));
+    }
 }

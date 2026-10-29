@@ -122,4 +122,19 @@ class Blake3FlexIdExtTest extends TestCase
         $this::expectException(\InvalidArgumentException::class);
         new Blake3HMACFlexIdExt($key);
     }
+
+    public function testWrongSalt(): void
+    {
+        $this::expectException(\InvalidArgumentException::class);
+        new Blake3HMACFlexIdExt(base64EncodedKey: KeyGen::generate(), hkdfSalt: 'dfhdg');
+    }
+
+    public function testWithSalt(): void
+    {
+        $key = KeyGen::generate();
+        $hash = new Blake3HMACFlexIdExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+        $hash2 = new Blake3HMACFlexIdExt(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+
+        $this::assertNotSame($hash->sign('foo'), $hash2->sign('foo'));
+    }
 }

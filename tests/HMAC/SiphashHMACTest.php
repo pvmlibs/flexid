@@ -36,4 +36,19 @@ class SiphashHMACTest extends TestCase
         $this::expectException(\InvalidArgumentException::class);
         new SiphashHMAC($key);
     }
+
+    public function testWrongSalt(): void
+    {
+        $this::expectException(\InvalidArgumentException::class);
+        new SiphashHMAC(base64EncodedKey: KeyGen::generate(), hkdfSalt: 'dfhdg');
+    }
+
+    public function testWithSalt(): void
+    {
+        $key = KeyGen::generate();
+        $hash = new SiphashHMAC(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+        $hash2 = new SiphashHMAC(base64EncodedKey: $key, hkdfSalt: KeyGen::generate());
+
+        $this::assertNotSame($hash->sign('foo'), $hash2->sign('foo'));
+    }
 }

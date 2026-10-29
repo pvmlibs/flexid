@@ -15,8 +15,13 @@ class Blake3HMACFlexIdExt implements HMACContract
 
     private int $parts = 1;
 
-    public function __construct(#[\SensitiveParameter] string $base64EncodedKey, string $hkdfInfo = 'blake3 mac')
-    {
+    public function __construct(
+        #[\SensitiveParameter]
+        string $base64EncodedKey,
+        string $hkdfInfo = 'blake3 mac',
+        #[\SensitiveParameter]
+        string $hkdfSalt = '',
+    ) {
         // @codeCoverageIgnoreStart
         if (\extension_loaded('flexid_utils') === false) {
             throw new \RuntimeException('Flexid extension is not available');
@@ -28,7 +33,12 @@ class Blake3HMACFlexIdExt implements HMACContract
         if ($decodedKey === false || \strlen($decodedKey) < 32) {
             throw new \InvalidArgumentException(\sprintf('Secret key is invalid. Ensure it is base64 encoded string and is at least 32 bytes long.'));
         }
-        $derivedKey = \hash_hkdf('sha3-256', $decodedKey, 32, $hkdfInfo);
+        $decodedSalt = \base64_decode($hkdfSalt, true);
+
+        if ($decodedSalt === false) {
+            throw new \InvalidArgumentException(\sprintf('Salt must be base64 encoded'));
+        }
+        $derivedKey = \hash_hkdf('sha3-256', $decodedKey, 32, $hkdfInfo, $decodedSalt);
         $this->hash = new \FlexId\Blake3($derivedKey);
     }
 

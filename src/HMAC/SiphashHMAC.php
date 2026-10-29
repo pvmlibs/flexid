@@ -14,17 +14,22 @@ class SiphashHMAC implements HMACContract
 {
     private HMACContract $hmac;
 
-    public function __construct(#[\SensitiveParameter] string $base64EncodedKey, string $hkdfInfo = 'siphash mac')
-    {
+    public function __construct(
+        #[\SensitiveParameter]
+        string $base64EncodedKey,
+        string $hkdfInfo = 'siphash mac',
+        #[\SensitiveParameter]
+        string $hkdfSalt = '',
+    ) {
         // @codeCoverageIgnoreStart
         if (\extension_loaded('flexid_utils') === false) {
             if (\extension_loaded('sodium') === false) {
                 throw new \RuntimeException('Neither sodium or flexid extension is available');
             }
-            $this->hmac = new SiphashHMACSodiumExt($base64EncodedKey, $hkdfInfo);
+            $this->hmac = new SiphashHMACSodiumExt($base64EncodedKey, $hkdfInfo, $hkdfSalt);
 
         } else {
-            $this->hmac = new SiphashHMACFlexIdExt($base64EncodedKey, $hkdfInfo);
+            $this->hmac = new SiphashHMACFlexIdExt($base64EncodedKey, $hkdfInfo, $hkdfSalt);
         }
         // @codeCoverageIgnoreEnd
     }
