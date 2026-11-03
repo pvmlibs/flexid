@@ -2,3 +2,4 @@
 
 rm -f src/Scripts/RefPerf/perf.txt
 nice -20 docker exec flexid_php85 php -dopcache.enable=0 src/Scripts/perf.php $@
+nice -20 docker exec flexid_php85 php -dextension=flexid_utils.so -dopcache.enable=0 src/Scripts/perf.php $@

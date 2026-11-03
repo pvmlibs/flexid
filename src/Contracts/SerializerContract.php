@@ -27,4 +27,6 @@ interface SerializerContract
     public function getMaxEncodedLength(): int;
 
     public function getAlphabet(): string;
+
+    public function isFixedLength(): bool;
 }

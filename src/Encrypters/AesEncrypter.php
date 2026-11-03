@@ -21,6 +21,10 @@ use Pvmlibs\FlexId\Encrypters\Ciphers\AesCipher;
  */
 class AesEncrypter extends Generic128EncrypterWithMac
 {
+    /**
+     * @param string $separator character used to separate two 64-bit parts of serialized data. It is used only when
+     *                          encoded parts are shorter than max serialized length and $serializer->isFixedLength() is false.
+     */
     public function __construct(
         #[\SensitiveParameter]
         string $base64secret,

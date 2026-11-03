@@ -41,7 +41,7 @@ class Sparx128
 
 class Encoder
 {
-    public function __construct(string $alphabet, string $separator = ' ') {}
+    public function __construct(string $alphabet, string $separator = ' ', bool $fixedLength = false) {}
     public function encode(int $num): string {}
     public function decode(string $input): int {}
 

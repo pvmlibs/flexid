@@ -44,6 +44,22 @@ final class CustomSerializerFlexIdTest extends TestCase
         }
     }
 
+    public function testSerializeDeserializeFixedLength(): void
+    {
+        $serializer = new CustomSerializerFlexIdExt(fixedLength: true);
+        $this->validateSerializeDeserialize($serializer);
+
+        foreach ($this->alphabets() as $alphabet) {
+            $serializer = new CustomSerializerFlexIdExt($alphabet, true);
+            $this->validateSerializeDeserialize(serializer: $serializer, incrementalRange: 100, withRandom: false);
+
+            $this->validateOutOfRange($alphabet, $serializer, -1);
+            $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(123456)));
+            $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(1)));
+            $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(0)));
+        }
+    }
+
     public function testEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -99,10 +115,29 @@ final class CustomSerializerFlexIdTest extends TestCase
         }
     }
 
+    public function testInteroperabilityCustomSerializerFixedLength(): void
+    {
+        foreach ($this->alphabets() as $alphabet) {
+            $customSerializerFlexId = new CustomSerializerFlexIdExt($alphabet, true);
+            $customSerializerPHP = new CustomSerializerPHP(new FullRangeIntegersBCMath(), $alphabet, true);
+            $this::assertSame($this->runDeterministicBatch($customSerializerPHP), $this->runDeterministicBatch($customSerializerFlexId));
+            $this::assertSame($customSerializerPHP->getMaxEncodedLength(), $customSerializerFlexId->getMaxEncodedLength());
+        }
+    }
+
     public function testInteroperabilityBaseSerializer(): void
     {
         $baseSerializerFlexId = new CustomSerializerFlexIdExt(Alphabets::BASE32_SAFE_ALPHABET);
         $baseSerializerPHP = new BaseSerializerPHP();
+
+        $this::assertSame($this->runDeterministicBatch($baseSerializerPHP), $this->runDeterministicBatch($baseSerializerFlexId));
+        $this::assertSame($baseSerializerPHP->getMaxEncodedLength(), $baseSerializerFlexId->getMaxEncodedLength());
+    }
+
+    public function testInteroperabilityBaseSerializerFixedLength(): void
+    {
+        $baseSerializerFlexId = new CustomSerializerFlexIdExt(Alphabets::BASE32_SAFE_ALPHABET, true);
+        $baseSerializerPHP = new BaseSerializerPHP(fixedLength: true);
 
         $this::assertSame($this->runDeterministicBatch($baseSerializerPHP), $this->runDeterministicBatch($baseSerializerFlexId));
         $this::assertSame($baseSerializerPHP->getMaxEncodedLength(), $baseSerializerFlexId->getMaxEncodedLength());

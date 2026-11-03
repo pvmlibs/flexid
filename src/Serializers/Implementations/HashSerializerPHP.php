@@ -253,6 +253,11 @@ class HashSerializerPHP implements SerializerContract
         return $this->alphabet;
     }
 
+    public function isFixedLength(): bool
+    {
+        return false;
+    }
+
     public function getMaxRange(): int
     {
         return PHP_INT_MAX - $this->offset;

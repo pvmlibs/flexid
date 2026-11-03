@@ -29,6 +29,16 @@ RUN apk add --update \
     mv composer.phar /usr/local/bin/composer && \
     chmod +x /usr/local/bin/composer && \
     chown $DOCKER_USER:$DOCKER_USER /usr/local/bin/composer && \
+    # get pie
+    wget https://github.com/php/pie/releases/download/1.5.5/pie.phar && \
+    mv pie.phar /usr/local/bin/pie && \
+    chmod +x /usr/local/bin/pie && \
+    # get raw extension for easier testing perf \
+    wget https://github.com/pvmlibs/flexid_utils/releases/download/1.1.0/php_flexid_utils-1.1.0_php8.5-x86_64-linux-musl-nts.tgz && \
+    tar -zxvf php_flexid_utils-1.1.0_php8.5-x86_64-linux-musl-nts.tgz && \
+    mv flexid_utils.so /usr/lib/php85/modules/ && \
+    rm php_flexid_utils-1.1.0_php8.5-x86_64-linux-musl-nts.tgz && \
+    chown $DOCKER_USER:$DOCKER_USER /usr/local/bin/pie && \
     mkdir -p /var/www && \
     chown -R $DOCKER_USER:$DOCKER_USER /var/www && \
     ln -s /usr/bin/php$PHP_VERSION /usr/bin/php || true

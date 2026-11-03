@@ -59,6 +59,15 @@ final class Sparx128TurboEncrypterTest extends TestCase
         $encrypter->decrypt($encryptedWithAD);
     }
 
+    public function testFixedLength(): void
+    {
+        $key = KeyGen::generate();
+        $encrypter = new Sparx128TurboEncrypter(base64secret: $key, fixedLength: true);
+        for ($i = 0; $i < 1000; $i++) {
+            $this::assertSame($encrypter->maxOutputLength(), \strlen($encrypter->encrypt($i)));
+        }
+    }
+
     public function testInvalidSeparator(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -146,12 +155,34 @@ final class Sparx128TurboEncrypterTest extends TestCase
         $this::assertNotSame($encrypter->encrypt(123456), $encrypter2->encrypt(123456));
     }
 
-    public function testInteroperabilityCustomSerializer(): void
+    public function testInteroperabilityWithSparx128Encrypter(): void
     {
         $key = 'HtPA2DA8cy2gRUC4h+tKnKIjUt5xuLJzkmKc3MtwZpc=';
         $encrypterTurbo = new Sparx128TurboEncrypter(base64secret: $key, alphabet: Alphabets::BASE32_SAFE_ALPHABET);
         $hmac = new SiphashHMAC($key);
         $encrypterDefault = new Sparx128Encrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer());
+
+        $incrementHashTurbo = hash_init('sha256');
+        $incrementHashDefault = hash_init('sha256');
+
+        // across whole range
+        $step = \intdiv(PHP_INT_MAX, 1000);
+        for ($i = 1; $i < PHP_INT_MAX; $i += $step) {
+            \hash_update($incrementHashDefault, $encrypterDefault->encrypt($i));
+            \hash_update($incrementHashTurbo, $encrypterTurbo->encrypt($i));
+            \hash_update($incrementHashDefault, $encrypterDefault->encrypt(-$i));
+            \hash_update($incrementHashTurbo, $encrypterTurbo->encrypt(-$i));
+        }
+
+        $this::assertSame(\hash_final($incrementHashDefault), \hash_final($incrementHashTurbo));
+    }
+
+    public function testInteroperabilityWithSparx128EncrypterFixedLength(): void
+    {
+        $key = 'HtPA2DA8cy2gRUC4h+tKnKIjUt5xuLJzkmKc3MtwZpc=';
+        $encrypterTurbo = new Sparx128TurboEncrypter(base64secret: $key, alphabet: Alphabets::BASE32_SAFE_ALPHABET, fixedLength: true);
+        $hmac = new SiphashHMAC($key);
+        $encrypterDefault = new Sparx128Encrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer(fixedLength: true));
 
         $incrementHashTurbo = hash_init('sha256');
         $incrementHashDefault = hash_init('sha256');

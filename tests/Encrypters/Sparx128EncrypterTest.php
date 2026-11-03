@@ -52,6 +52,16 @@ final class Sparx128EncrypterTest extends TestCase
         $this->runBatchForEncoding(secret: $key, serializer: new BaseSerializer(), hmac: $hmac);
     }
 
+    public function testFixedLength(): void
+    {
+        $key = KeyGen::generate();
+        $hmac = new Sha256HMAC($key);
+        $encrypter = new Sparx128Encrypter(base64secret: $key, hmac: $hmac, serializer: new BaseSerializer(fixedLength: true));
+        for ($i = 0; $i < 1000; $i++) {
+            $this::assertSame($encrypter->maxOutputLength(), \strlen($encrypter->encrypt($i)));
+        }
+    }
+
     public function testInvalidSeparator(): void
     {
         $this->expectException(\InvalidArgumentException::class);

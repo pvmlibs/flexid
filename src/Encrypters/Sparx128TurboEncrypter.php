@@ -24,8 +24,11 @@ class Sparx128TurboEncrypter implements EncrypterWithMacContract
      * @param string $base64secret 32-bit secret in base64 encoding. It will be also used for MAC, using HKDF.
      * @param string $signHkdfInfo info message for HKDF
      * @param string $alphabet     alphabet for serializing data
-     * @param string $separator    character used to separate two 64-bit parts of serialized data. It is used only when necessary.
+     * @param string $separator    character used to separate two 64-bit parts of serialized data. It is used only when
+     *                             encoded parts are shorter than max serialized length and $fixedLength is false.
      * @param string $hkdfSalt     base64 encoded salt for HKDF
+     * @param bool   $fixedLength  should output be always fixed length (max for given alphabet length).
+     *                             If true then separator is not used.
      *
      * @throws \InvalidArgumentException
      */
@@ -37,6 +40,7 @@ class Sparx128TurboEncrypter implements EncrypterWithMacContract
         string $separator = '.',
         #[\SensitiveParameter]
         string $hkdfSalt = '',
+        bool $fixedLength = false,
     ) {
         // @codeCoverageIgnoreStart
         if (\extension_loaded('flexid_utils') === false) {
@@ -58,7 +62,7 @@ class Sparx128TurboEncrypter implements EncrypterWithMacContract
 
         try {
             $this->cipher = new \FlexId\Sparx128($decodedSecret);
-            $this->encoder = new \FlexId\Encoder($alphabet, $separator);
+            $this->encoder = new \FlexId\Encoder($alphabet, $separator, $fixedLength);
             $this->hmac = new \FlexId\Siphash($derivedKey);
         } catch (\ValueError $ex) {
             throw new \InvalidArgumentException($ex->getMessage());

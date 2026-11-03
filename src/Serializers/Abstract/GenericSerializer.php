@@ -32,4 +32,9 @@ class GenericSerializer implements SerializerContract
     {
         return $this->serializer->getAlphabet();
     }
+
+    public function isFixedLength(): bool
+    {
+        return $this->serializer->isFixedLength();
+    }
 }

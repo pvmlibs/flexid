@@ -94,6 +94,11 @@ class HashSerializerFlexIdExt implements SerializerContract
         return PHP_INT_MAX - $this->offset;
     }
 
+    public function isFixedLength(): bool
+    {
+        return false;
+    }
+
     public function getOffset(): int
     {
         return $this->offset;

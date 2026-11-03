@@ -23,12 +23,14 @@ class BaseSerializerPHP implements SerializerContract
     private readonly int $maxPosition;
 
     /**
-     * @param string $alphabet Length must be power of 2
+     * @param string $alphabet    Length must be power of 2
+     * @param bool   $fixedLength should output be always fixed length (max for given alphabet length)
      *
      * @throws \InvalidArgumentException
      */
     public function __construct(
         private string $alphabet = Alphabets::BASE32_SAFE_ALPHABET,
+        private bool $fixedLength = false,
     ) {
         $this->alphabetLength = \strlen($this->alphabet);
 
@@ -92,6 +94,10 @@ class BaseSerializerPHP implements SerializerContract
             $result .= $this->alphabet[$reminder];
         }
 
+        while ($this->fixedLength && strlen($result) < $this->maxLength) {
+            $result .= $this->alphabet[0];
+        }
+
         return $result;
     }
 
@@ -131,5 +137,10 @@ class BaseSerializerPHP implements SerializerContract
     public function getAlphabet(): string
     {
         return $this->alphabet;
+    }
+
+    public function isFixedLength(): bool
+    {
+        return $this->fixedLength;
     }
 }

@@ -51,4 +51,9 @@ class Base64Serializer implements SerializerContract
     {
         return '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
     }
+
+    public function isFixedLength(): bool
+    {
+        return false;
+    }
 }

@@ -27,13 +27,16 @@ class CustomSerializerPHP implements SerializerContract
     private IntegerOperationsContract $integerOperations;
 
     /**
-     * @param string $alphabet Supports lengths <2, 94>
+     * @param ?IntegerOperationsContract $fullRangeIntegerOperations if null then only positive numbers are allowed, otherwise full range
+     * @param string                     $alphabet                   Supports lengths <2, 94>
+     * @param bool                       $fixedLength                should output be always fixed length (max for given alphabet and $fullRangeIntegerOperations type)
      *
      * @throws \InvalidArgumentException
      */
     public function __construct(
         ?IntegerOperationsContract $fullRangeIntegerOperations = null,
         private string $alphabet = Alphabets::CUSTOM_SAFE_ALPHABET,
+        private bool $fixedLength = false,
     ) {
         if (\strlen($alphabet) < 2 || \strlen($alphabet) > 94) {
             throw new \InvalidArgumentException('Alphabet length must be <2, 94>');
@@ -54,12 +57,17 @@ class CustomSerializerPHP implements SerializerContract
         }
 
         if ($this->integerOperations instanceof PositiveIntegersOnly) {
-            $maxSerialized = $this->serialize(PHP_INT_MAX); // max range for positive id
-            $this->maxLength = \strlen($maxSerialized);
+            $maxSerialized = PHP_INT_MAX; // max range for positive id
         } else {
-            $maxSerialized = $this->serialize(-1); // max range for full range id
-            $this->maxLength = \strlen($maxSerialized);
+            $maxSerialized = -1; // max range for full range id
         }
+
+        $outputLength = 0;
+        do {
+            $outputLength++;
+            [$maxSerialized] = $this->integerOperations->divmod($maxSerialized, \strlen($alphabet));
+        } while ($maxSerialized > 0);
+        $this->maxLength = $outputLength;
     }
 
     public function serialize(int $data): string
@@ -70,7 +78,7 @@ class CustomSerializerPHP implements SerializerContract
 
         $result = $this->alphabet[$reminder];
 
-        if ($quotient === 0) {
+        if ($quotient === 0 && $this->fixedLength === false) {
             return $result;
         }
 
@@ -83,6 +91,10 @@ class CustomSerializerPHP implements SerializerContract
 
         // here always >= 1 chars, this will be last, 2 div less.
         $result .= $this->alphabet[$quotient];
+
+        while ($this->fixedLength && \strlen($result) < $this->maxLength) {
+            $result .= $this->alphabet[0];
+        }
 
         return $result;
     }
@@ -124,5 +136,10 @@ class CustomSerializerPHP implements SerializerContract
     public function getAlphabet(): string
     {
         return $this->alphabet;
+    }
+
+    public function isFixedLength(): bool
+    {
+        return $this->fixedLength;
     }
 }

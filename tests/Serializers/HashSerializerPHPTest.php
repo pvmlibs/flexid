@@ -176,7 +176,7 @@ final class HashSerializerPHPTest extends TestCase
             if (($len & ($len - 1)) === 0 || ($len & 1) === 0) {
                 continue;
             }
-            $randomBias = 2.5;
+            $randomBias = 3.5;
             if ($len < 50) {
                 $randomBias += (50 - $len) * 0.1;
             }

@@ -19,15 +19,19 @@ use Pvmlibs\FlexId\Tools\Alphabets;
  */
 class BaseSerializer extends GenericSerializer
 {
+    /**
+     * @param bool $fixedLength should output be always fixed length (max for given alphabet length)
+     */
     public function __construct(
         string $alphabet = Alphabets::BASE32_SAFE_ALPHABET,
         bool $forcePHPImplementation = false,
+        private bool $fixedLength = false,
     ) {
         // @codeCoverageIgnoreStart
         if (extension_loaded('flexid_utils') === false || $forcePHPImplementation) {
-            $serializer = new BaseSerializerPHP($alphabet);
+            $serializer = new BaseSerializerPHP($alphabet, $this->fixedLength);
         } else {
-            $serializer = new CustomSerializerFlexIdExt($alphabet);
+            $serializer = new CustomSerializerFlexIdExt($alphabet, $this->fixedLength);
         }
         // @codeCoverageIgnoreEnd
 

@@ -21,7 +21,9 @@ use Pvmlibs\FlexId\Tools\Alphabets;
 class CustomSerializer extends GenericSerializer
 {
     /**
-     * @param string $alphabet Supports lengths <2, 94>
+     * @param ?IntegerOperationsContract $fullRangeIntegerOperations if null then only positive numbers are allowed, otherwise full range
+     * @param string                     $alphabet                   Supports lengths <2, 94>
+     * @param bool                       $fixedLength                should output be always fixed length (max for given alphabet and $fullRangeIntegerOperations type)
      *
      * @throws \InvalidArgumentException
      */
@@ -29,12 +31,13 @@ class CustomSerializer extends GenericSerializer
         ?IntegerOperationsContract $fullRangeIntegerOperations = null,
         string $alphabet = Alphabets::CUSTOM_SAFE_ALPHABET,
         bool $forcePHPImplementation = false,
+        private bool $fixedLength = false,
     ) {
         // @codeCoverageIgnoreStart
         if (\extension_loaded('flexid_utils') === false || $forcePHPImplementation) {
-            $serializer = new CustomSerializerPHP($fullRangeIntegerOperations, $alphabet);
+            $serializer = new CustomSerializerPHP($fullRangeIntegerOperations, $alphabet, $this->fixedLength);
         } else {
-            $serializer = new CustomSerializerFlexIdExt($alphabet);
+            $serializer = new CustomSerializerFlexIdExt($alphabet, $this->fixedLength);
         }
         // @codeCoverageIgnoreEnd
 

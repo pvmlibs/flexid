@@ -24,12 +24,14 @@ class CustomSerializerFlexIdExt implements SerializerContract
     private \FlexId\Encoder $encoder;
 
     /**
-     * @param string $alphabet Supports lengths <2, 94>
+     * @param string $alphabet    Supports lengths <2, 94>
+     * @param bool   $fixedLength should output be always fixed length (max for given alphabet length)
      *
      * @throws \InvalidArgumentException
      */
     public function __construct(
         private string $alphabet = Alphabets::CUSTOM_SAFE_ALPHABET,
+        private bool $fixedLength = false,
     ) {
         if (\strlen($alphabet) < 2 || \strlen($alphabet) > 94) {
             throw new \InvalidArgumentException('Alphabet length must be <2, 94>');
@@ -43,7 +45,7 @@ class CustomSerializerFlexIdExt implements SerializerContract
             throw new \InvalidArgumentException('Alphabet must not contain multi byte characters');
         }
 
-        $this->encoder = new \FlexId\Encoder($this->alphabet);
+        $this->encoder = new \FlexId\Encoder(alphabet: $this->alphabet, fixedLength: $this->fixedLength);
     }
 
     public function serialize(int $data): string
@@ -72,5 +74,10 @@ class CustomSerializerFlexIdExt implements SerializerContract
     public function getAlphabet(): string
     {
         return $this->alphabet;
+    }
+
+    public function isFixedLength(): bool
+    {
+        return $this->fixedLength;
     }
 }

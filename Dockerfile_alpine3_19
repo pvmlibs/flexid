@@ -27,10 +27,15 @@ RUN apk add --update \
     adduser -D $DOCKER_USER && \
     addgroup $DOCKER_USER www-data && \
     # Get composer
-    wget https://getcomposer.org/download/2.9.8/composer.phar && \
+    wget https://getcomposer.org/download/2.11.1/composer.phar && \
     mv composer.phar /usr/local/bin/composer && \
     chmod +x /usr/local/bin/composer && \
     chown $DOCKER_USER:$DOCKER_USER /usr/local/bin/composer && \
+    # get pie
+    wget https://github.com/php/pie/releases/download/1.5.5/pie.phar && \
+    mv pie.phar /usr/local/bin/pie && \
+    chmod +x /usr/local/bin/pie && \
+    chown $DOCKER_USER:$DOCKER_USER /usr/local/bin/pie && \
     mkdir -p /var/www && \
     chown -R $DOCKER_USER:$DOCKER_USER /var/www && \
     ln -s /usr/bin/php$PHP_VERSION /usr/bin/php || true

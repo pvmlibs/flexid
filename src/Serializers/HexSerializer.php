@@ -51,4 +51,9 @@ class HexSerializer implements SerializerContract
     {
         return '0123456789abcdef';
     }
+
+    public function isFixedLength(): bool
+    {
+        return true;
+    }
 }

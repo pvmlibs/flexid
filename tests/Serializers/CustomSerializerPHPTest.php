@@ -38,6 +38,22 @@ final class CustomSerializerPHPTest extends TestCase
         $serializer->serialize(-1);
     }
 
+    public function testSerializeDeserializeFixedLength(): void
+    {
+        $serializer = new CustomSerializerPHP(fixedLength: true);
+        $this->validateSerializeDeserialize($serializer, true);
+
+        foreach ($this->alphabets() as $alphabet) {
+            $serializer = new CustomSerializerPHP(alphabet: $alphabet, fixedLength: true);
+            $this->validateSerializeDeserialize(serializer: $serializer, positivesOnly: true, incrementalRange: 100);
+
+            $this->validateOutOfRange($alphabet, $serializer, PHP_INT_MAX);
+            $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(123456)));
+            $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(1)));
+            $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(0)));
+        }
+    }
+
     public function testSerializeDeserializeFullRange(): void
     {
         $serializer = new CustomSerializerPHP(fullRangeIntegerOperations: new FullRangeIntegersBCMath());

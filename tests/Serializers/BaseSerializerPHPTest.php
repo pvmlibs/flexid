@@ -34,6 +34,24 @@ final class BaseSerializerPHPTest extends TestCase
         }
     }
 
+    public function testSerializeDeserializeFixedLength(): void
+    {
+        $serializer = new BaseSerializerPHP(fixedLength: true);
+        $this->validateSerializeDeserialize($serializer);
+
+        foreach ($this->alphabets() as $alphabet) {
+            if ((\strlen($alphabet) & (\strlen($alphabet) - 1)) === 0) { // only power of 2 for now
+                $serializer = new BaseSerializerPHP(alphabet: $alphabet, fixedLength: true);
+                $this->validateSerializeDeserialize(serializer: $serializer, incrementalRange: 100, withRandom: false);
+
+                $this->validateOutOfRange($alphabet, $serializer, -1);
+                $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(123456)));
+                $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(1)));
+                $this::assertSame($serializer->getMaxEncodedLength(), \strlen($serializer->serialize(0)));
+            }
+        }
+    }
+
     public function testEmptyAlphabet(): void
     {
         $this->expectException(\InvalidArgumentException::class);
