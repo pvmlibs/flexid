@@ -48,7 +48,7 @@ jobs:
 
       - name: Code coverage
         run: |
-          curl -fsSL "https://github.com/pvmlibs/flexid_utils/releases/download/1.0.8/php_flexid_utils-1.0.8_php8.1-x86_64-linux-glibc-nts.tgz" | tar -xz -C .
+          curl -fsSL "https://github.com/pvmlibs/flexid_utils/releases/download/1.1.0/php_flexid_utils-1.1.0_php8.1-x86_64-linux-glibc-nts.tgz" | tar -xz -C .
           php -d extension=./flexid_utils.so vendor/bin/phpunit --coverage-clover=coverage.xml
         env:
           TESTING_REDIS_HOST: localhost

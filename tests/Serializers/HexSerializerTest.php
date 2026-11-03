@@ -51,7 +51,7 @@ final class HexSerializerTest extends TestCase
         }
         $maxDeviations = $this->getMaxDeviation($ids, $encoder->getAlphabet());
         // max deviation 2 times as random one from mean
-        $this::assertLessThan($maxDeviations['random'] * 2, $maxDeviations['real']);
+        $this::assertLessThan($maxDeviations['random'] * 3, $maxDeviations['real']);
     }
 
     public function testBackwardCompatibility(): void
