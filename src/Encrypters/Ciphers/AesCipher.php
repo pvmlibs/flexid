@@ -45,7 +45,7 @@ class AesCipher implements Cipher128Contract
 
     public function encrypt(int $lowPart, int $highPart): array
     {
-        $serialized = pack('Q2', $lowPart, $highPart);
+        $serialized = pack('P2', $lowPart, $highPart);
         $ciphertext = \openssl_encrypt($serialized, 'aes-256-ecb', $this->key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING);
 
         if ($ciphertext === false) {
@@ -53,7 +53,7 @@ class AesCipher implements Cipher128Contract
         }
 
         // unpack 2 * 8 bytes, 128bit
-        $unpacked = @\unpack('Q2', $ciphertext);
+        $unpacked = @\unpack('P2', $ciphertext);
 
         if ($unpacked === false) {
             throw new IdEncodeException('Failed to encrypt data');
@@ -64,7 +64,7 @@ class AesCipher implements Cipher128Contract
 
     public function decrypt(int $lowPart, int $highPart): array
     {
-        $serialized = pack('Q2', $lowPart, $highPart);
+        $serialized = pack('P2', $lowPart, $highPart);
         $plaintext = \openssl_decrypt($serialized, 'aes-256-ecb', $this->key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING);
 
         if ($plaintext === false) {
@@ -72,7 +72,7 @@ class AesCipher implements Cipher128Contract
         }
 
         // unpack 2 * 8 bytes, 128bit
-        $unpacked = @\unpack('Q2', $plaintext);
+        $unpacked = @\unpack('P2', $plaintext);
 
         if ($unpacked === false) {
             throw new IdDecryptException('Failed to encrypt data');

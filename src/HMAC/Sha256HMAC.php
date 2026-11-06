@@ -9,7 +9,7 @@ use Pvmlibs\FlexId\Exceptions\IdSigningException;
 
 class Sha256HMAC implements HMACContract
 {
-    private string $unpackFormat = 'Q';
+    private string $unpackFormat = 'P';
     private string $key;
 
     public function __construct(
@@ -38,14 +38,14 @@ class Sha256HMAC implements HMACContract
             throw new \InvalidArgumentException(\sprintf('SHA-256 supports 64-256 bits output'));
         }
 
-        $this->unpackFormat = 'Q' . $output64bitWords;
+        $this->unpackFormat = 'P' . $output64bitWords;
     }
 
     public function sign(string $data, ?int $id = null): array
     {
         $signData = @unpack(
             $this->unpackFormat,
-            \hash_hmac('sha256', ($id !== null ? pack('Q', $id) : '') . $data, $this->key, true),
+            \hash_hmac('sha256', ($id !== null ? pack('P', $id) : '') . $data, $this->key, true),
         );
         if ($signData === false) {
             throw new IdSigningException('Sign hash failed');

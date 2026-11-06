@@ -93,7 +93,7 @@ class XChaCha20Encrypter implements EncrypterWithMacContract
         $nounceIndex++;
 
         $ciphertext = \sodium_crypto_aead_xchacha20poly1305_ietf_encrypt(
-            message: \pack('Q', $id),
+            message: \pack('P', $id),
             additional_data: $additionalData, // additional data for authentication
             nonce: $nonce,
             key: $this->key,
@@ -134,7 +134,7 @@ class XChaCha20Encrypter implements EncrypterWithMacContract
             throw new IdDecryptException('Could not decrypt id');
         }
 
-        $id = @unpack('Q', $decrypted);
+        $id = @unpack('P', $decrypted);
 
         if ($id === false) {
             throw new IdDecryptException('Could not extract id');

@@ -38,7 +38,7 @@ class SiphashFlexIdExtTest extends TestCase
                 $input .= \chr($i);
             }
             $lastInputLen = $vector['input_len'];
-            $this::assertSame($vector['output'], \bin2hex(\pack('Q', $hash->hash($input))));
+            $this::assertSame($vector['output'], \bin2hex(\pack('P', $hash->hash($input))));
         }
     }
 
@@ -49,8 +49,8 @@ class SiphashFlexIdExtTest extends TestCase
 
         for ($i = 0; $i < 100; $i++) {
             $this::assertSame(
-                \bin2hex(\sodium_crypto_shorthash(\pack('Q', $i), $key)),
-                \bin2hex(\pack('Q', $hash->hash('', $i))),
+                \bin2hex(\sodium_crypto_shorthash(\pack('P', $i), $key)),
+                \bin2hex(\pack('P', $hash->hash('', $i))),
             );
         }
     }
@@ -64,18 +64,18 @@ class SiphashFlexIdExtTest extends TestCase
         $hash = new \FlexId\Siphash($key);
 
         $this::assertSame(
-            $hash->hash(\pack('Q', PHP_INT_MAX), null),
+            $hash->hash(\pack('P', PHP_INT_MAX), null),
             $hash->hash('', PHP_INT_MAX),
         );
 
         $this::assertSame(
-            $hash->hash(\pack('Q', 0), null),
+            $hash->hash(\pack('P', 0), null),
             $hash->hash('', 0),
         );
 
         for ($i = 1; $i < 100000; $i += 10000) {
             $this::assertSame(
-                $hash->hash(\pack('Q', $i) . 'some test', null),
+                $hash->hash(\pack('P', $i) . 'some test', null),
                 $hash->hash('some test', $i),
             );
         }
@@ -86,17 +86,17 @@ class SiphashFlexIdExtTest extends TestCase
         $hash = new SiphashHMACFlexIdExt(KeyGen::generate());
 
         $this::assertSame(
-            $hash->sign(\pack('Q', PHP_INT_MAX)),
+            $hash->sign(\pack('P', PHP_INT_MAX)),
             $hash->sign('', PHP_INT_MAX),
         );
         $this::assertSame(
-            $hash->sign(\pack('Q', 0)),
+            $hash->sign(\pack('P', 0)),
             $hash->sign('', 0),
         );
 
         for ($i = 1; $i < 100; $i++) {
             $this::assertSame(
-                $hash->sign(\pack('Q', $i) . 'some test'),
+                $hash->sign(\pack('P', $i) . 'some test'),
                 $hash->sign('some test', $i),
             );
         }

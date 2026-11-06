@@ -49,11 +49,11 @@ class Base64Serializer implements SerializerContract
 
     public function getAlphabet(): string
     {
-        return '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
+        return 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
     }
 
     public function isFixedLength(): bool
     {
-        return false;
+        return true;
     }
 }

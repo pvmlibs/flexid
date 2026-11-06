@@ -47,7 +47,7 @@ class Blake3FlexIdExtTest extends TestCase
     {
         $result = '';
         foreach ($a as $v) {
-            $result .= \bin2hex(\pack('Q', $v));
+            $result .= \bin2hex(\pack('P', $v));
         }
 
         return $result;
@@ -58,18 +58,18 @@ class Blake3FlexIdExtTest extends TestCase
         $hash = new \FlexId\Blake3('whats the Elvish word for friend');
 
         $this::assertSame(
-            $hash->hash(\pack('Q', PHP_INT_MAX), null, 4),
+            $hash->hash(\pack('P', PHP_INT_MAX), null, 4),
             $hash->hash('', PHP_INT_MAX, 4),
         );
 
         $this::assertSame(
-            $hash->hash(\pack('Q', 0), null, 4),
+            $hash->hash(\pack('P', 0), null, 4),
             $hash->hash('', 0, 4),
         );
 
         for ($i = 1; $i < 100000; $i += 10000) {
             $this::assertSame(
-                $hash->hash(\pack('Q', $i) . 'some test', null, 4),
+                $hash->hash(\pack('P', $i) . 'some test', null, 4),
                 $hash->hash('some test', $i, 4),
             );
         }
@@ -80,17 +80,17 @@ class Blake3FlexIdExtTest extends TestCase
         $hash = new Blake3HMACFlexIdExt(KeyGen::generate());
 
         $this::assertSame(
-            $hash->sign(\pack('Q', PHP_INT_MAX)),
+            $hash->sign(\pack('P', PHP_INT_MAX)),
             $hash->sign('', PHP_INT_MAX),
         );
         $this::assertSame(
-            $hash->sign(\pack('Q', 0)),
+            $hash->sign(\pack('P', 0)),
             $hash->sign('', 0),
         );
 
         for ($i = 1; $i < 100000; $i += 200) {
             $this::assertSame(
-                $hash->sign(\pack('Q', $i) . 'some test'),
+                $hash->sign(\pack('P', $i) . 'some test'),
                 $hash->sign('some test', $i),
             );
         }

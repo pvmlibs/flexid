@@ -43,7 +43,7 @@ final class Base64SerializerTest extends TestCase
     public function testFixedLength(): void
     {
         $serializer = new Base64Serializer();
-        $this::assertFalse($serializer->isFixedLength());
+        $this::assertTrue($serializer->isFixedLength());
     }
 
     public function testEvenCharsDistribution(): void

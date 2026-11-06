@@ -113,7 +113,7 @@ final class GeneratorWithRedisReservedResolverTest extends TestCase
         $workerId = $resolver->getCurrentWorkerId();
 
         // wait till timeout
-        \usleep(70000);
+        \usleep(71000);
 
         $ids[] = $generator->id();
 

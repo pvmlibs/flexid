@@ -31,10 +31,10 @@ final class Sparx64CipherFlexIdTest extends TestCase
 
         $cipher = new Sparx64CipherFlexIdExt(\base64_encode($key));
 
-        $unpacked = \unpack('Q', $plaintext);
+        $unpacked = \unpack('P', $plaintext);
         $this::assertNotFalse($unpacked);
 
-        $this::assertSame($ciphertext, \pack('Q', $cipher->encrypt($unpacked[1])));
+        $this::assertSame($ciphertext, \pack('P', $cipher->encrypt($unpacked[1])));
     }
 
     public function testBatch(): void

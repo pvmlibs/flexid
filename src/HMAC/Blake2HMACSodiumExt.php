@@ -10,7 +10,7 @@ use Pvmlibs\FlexId\Exceptions\IdSigningException;
 class Blake2HMACSodiumExt implements HMACContract
 {
     private string $key;
-    private string $unpackFormat = 'Q';
+    private string $unpackFormat = 'P';
 
     public function __construct(
         #[\SensitiveParameter]
@@ -43,7 +43,7 @@ class Blake2HMACSodiumExt implements HMACContract
         if ($output64bitWords < 1 || $output64bitWords > 4) {
             throw new \InvalidArgumentException(\sprintf('Blake2 support 64 - 256 bits output'));
         }
-        $this->unpackFormat = 'Q' . $output64bitWords;
+        $this->unpackFormat = 'P' . $output64bitWords;
     }
 
     public function sign(string $data, ?int $id = null): array

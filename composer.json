@@ -1,6 +1,6 @@
 {
   "name": "pvmlibs/flexid",
-  "description": "Fast unique 64-bit integer ID generator",
+  "description": "Fast, unique 64-bit integer ID generator with handling tools",
   "type": "library",
   "keywords": [
     "id",
@@ -9,6 +9,7 @@
     "distributed",
     "fast",
     "unique",
+    "encrypter",
     "php"
   ],
   "license": "MIT",

@@ -25,13 +25,19 @@ class BaseSerializer extends GenericSerializer
     public function __construct(
         string $alphabet = Alphabets::BASE32_SAFE_ALPHABET,
         bool $forcePHPImplementation = false,
-        private bool $fixedLength = false,
+        bool $fixedLength = false,
     ) {
         // @codeCoverageIgnoreStart
         if (extension_loaded('flexid_utils') === false || $forcePHPImplementation) {
-            $serializer = new BaseSerializerPHP($alphabet, $this->fixedLength);
+            $serializer = new BaseSerializerPHP($alphabet, $fixedLength);
         } else {
-            $serializer = new CustomSerializerFlexIdExt($alphabet, $this->fixedLength);
+            $alphabetLength = \strlen($alphabet);
+            if (($alphabetLength & ($alphabetLength - 1)) !== 0) {
+                // to be interoperable with PHP implementation, we need to check alphabet length because
+                // CustomSerializerFlexIdExt can take any
+                throw new \InvalidArgumentException('Invalid alphabet length, must be power of 2 and <= 64, got ' . $alphabetLength);
+            }
+            $serializer = new CustomSerializerFlexIdExt($alphabet, $fixedLength);
         }
         // @codeCoverageIgnoreEnd
 

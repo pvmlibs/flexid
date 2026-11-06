@@ -42,11 +42,11 @@ final class Sparx128CipherTest extends TestCase
 
         $cipher = new Sparx128Cipher(\base64_encode($key));
 
-        $unpacked = \unpack('Q2', $plaintext);
+        $unpacked = \unpack('P2', $plaintext);
         $this::assertNotFalse($unpacked);
         $encrypted = $cipher->encrypt($unpacked[1], $unpacked[2]);
 
-        $this::assertSame($ciphertext, \pack('Q2', $encrypted[0], $encrypted[1]));
+        $this::assertSame($ciphertext, \pack('P2', $encrypted[0], $encrypted[1]));
     }
 
     public function testBatch(): void

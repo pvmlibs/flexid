@@ -46,8 +46,8 @@ class SiphashHMACSodiumExt implements HMACContract
 
     public function sign(string $data, ?int $id = null): array
     {
-        $hash = \sodium_crypto_shorthash(($id !== null ? \pack('Q', $id) : '') . $data, $this->key);
-        $result = \unpack('Q', $hash);
+        $hash = \sodium_crypto_shorthash(($id !== null ? \pack('P', $id) : '') . $data, $this->key);
+        $result = \unpack('P', $hash);
 
         if ($result === false) {
             throw new IdSigningException('Sign failed');
