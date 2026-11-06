@@ -6,6 +6,10 @@ namespace Pvmlibs\FlexId\Concerns;
 
 /**
  * Helper intended for use in target id class, as it uses static references per id.
+ * Provides convenient autoincrement id global uniqueness management with small risk of collisions.
+ * This is especially helpful with 64-bit encrypter, as the same id would produce the same output.
+ * With 128-bit encrypters, same id collisions depends on id sign collision risk mac(id || getSignData()), so not as
+ * bad but still, this offset lowers the id collision risk further.
  */
 trait HasDistributedOffset
 {

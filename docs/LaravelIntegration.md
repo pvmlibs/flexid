@@ -56,16 +56,24 @@ abstract class EncryptedIdAbstract implements Castable, \JsonSerializable
                 new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(config('id.secret_key'), new BaseSerializer()),
                 new Signer( // optional but recommended, we can use the same key, sign will use hkdf key derivation
                     serializer: new BaseSerializer(),
-                    hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC(config('id.secret_key')) // use SiphashHMAC for better performance
+                    hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC( // use SiphashHMAC for better performance
+                            base64EncodedKey: config('id.secret_key'),
+                            hkdfInfo: 'mac for encrypted id',
+                            hkdfSalt: config('id.hkdf_salt'),   // optional but makes hkdf much stronger
+                        )
                 ),
                 null, // here you can optionally pass IdGeneratorContract if you want to generate id from app
             ),
-            // Example for encryption (128-bit block, 256-bit key) with build-in sign (64 bit) (~26 chars).
-            // Ese Sparx128TurboEncrypter if possible.
+            // Example for encryption (128-bit block, 256-bit key) with build-in sign (64 bit) (up to 26 chars with Alphabets::BASE32_SAFE_ALPHABET).
+            // See also Sparx128TurboEncrypter for maximum performance.
             new EncryptedId(
                 new \Pvmlibs\FlexId\Encrypters\Sparx128Encrypter(
                     base64secret: config('id.secret_key'),
-                    hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC(config('id.secret_key')), // use SiphashHMAC for better performance
+                    hmac: new Pvmlibs\FlexId\HMAC\Sha256HMAC( // use SiphashHMAC for better performance
+                            base64EncodedKey: config('id.secret_key'),
+                            hkdfInfo: 'mac for encrypted id',
+                            hkdfSalt: config('id.hkdf_salt'),   // optional but makes hkdf much stronger                    
+                    ),
                     serializer: new BaseSerializer(),
                 );
                 null, // id have already a sign, but you can add additional sign
@@ -125,13 +133,13 @@ class IdTypeFoo extends BaseIncrementIdType1
 {
     // use HasDistributedOffset trait when encrypting autoincrement id, it will distribute it on negative int range, 
     // so encrypted output will be different for the same integer id with different id types (unique idUniqueTypeName).
-    // This is not suitable for short encoded id, in that case you can apply e.g. 1 million offset levels with method idOffset()
-    // Custom offset is also not recommended for timestamp based id, as they are globally unique anyway (if correctly configured)
+    // This is not suitable for short encoded id, as it will be not short anymore.
+    // Custom offset is also not intended for timestamp based id, as they are globally unique anyway (if correctly configured)
     
     // use HasDistributedOffset;
 
     // this method should return unique id type. It's literal string and not class name so it doesn't change with refactor
-    // this is used by signing id so id can be validated against its type. When changed, previous encoded id won't be decoded
+    // this is used to sign id so id can be validated against its type. When changed, previous encoded id won't be decoded
     // with the same IdHandlerContract configuration
     protected static function idUniqueTypeName(): string
     {

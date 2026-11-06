@@ -19,7 +19,7 @@ use something like uuidv4/uuidv7/other random id which have impact on DB perform
 information on id creation date (uuidv7).
 Now we can have performant integer ID in database and transform it to/from application on the fly, without storing
 transformed id and have additional protection for e.g. insecure direct object reference (IDOR) vulnerabilities.
-When id are signed, we can validate them even before hitting database.
+When id are signed, we can validate them even before touching database.
 
 ## Requirements
 
@@ -30,7 +30,7 @@ sign on vanilla php, required are only:
 2. PHP >= 8.1
 
 Some of additional features like some of encryptors, faster hashes, specialized worker resolvers requires additional
-extensions. For superior performance with encryptors and serializers use [flexid_utils]() extension.
+extensions. For superior performance with encryptors and serializers use [flexid_utils](https://github.com/pvmlibs/flexid_utils) extension.
 
 ## Installation
 
@@ -53,11 +53,11 @@ composer require pvmlibs/flexid
    - Sparx64Encrypter - uses Sparx lightweight ARX-based 64-bit block cipher that can transform ID to other 64-bit number
                         with 128-bit key. No php extensions required. For the same input, will give the same (permutated) output.
    - Sparx128Encrypter - uses Sparx with 256-bit key. Block size is 128-bit so first 64 bits takes id, the second
-                        one is used for HMAC sign. For the same input, will give the same (permutated) output.
+                        one is used for HMAC sign (with additional data support). For the same input, will give the same (permutated) output.
    - AesEncrypter - uses AES with 256-bit key. Block size is 128-bit so first 64 bits takes id, the second
-                    one is used for HMAC sign. For the same input, will give the same (permutated) output.
+                    one is used for HMAC sign (with additional data support). For the same input, will give the same (permutated) output.
                     Requires openssl extension. 
-   - XChaCha20Encrypter - stream cipher with 256-bit key, 128-bit sign and 192-bit nonce so the same input generates
+   - XChaCha20Encrypter - stream cipher with 256-bit key, 128-bit sign (with additional data support) and 192-bit nonce so the same input generates
                           different output. Produces the longest output from encrypters (64 with base64 - 96 with hex).
                           Requires sodium extension.
 4. Serializers - transforms 64 bits integer to string. By default, they use safe alphabet which prevent building random
@@ -74,7 +74,7 @@ composer require pvmlibs/flexid
 5. HMACS - keyed hashes using for signing id.
 7. Ciphers - ciphers (AesCipher, Sparx64/128Cipher that translates number to number). Can be also used when you want to
     operate only on numbers.
-6. Signers - sign ID using HMAC with secret key. It can ensure that ID comes from us and was not changed (confidence
+6. Signers - sign ID (or any string) using HMAC with secret key. It can ensure that ID comes from us and was not changed (confidence
       depends mainly on sign length). Uses serializer for producing printable output. 
      - Signer - customizable signer, by default uses 64 bit of hash data (customizable up to 256 bit), length can be
             also reduced up to 1 char, depending on application needs (e.g. for simple id checksum). Keep in mind that
@@ -115,7 +115,9 @@ Some general guidance:
 1. Use generator as singleton in application for performance and uniqueness guarantee (in StaticWorkerResolver and
    RandomWorkerResolver), unless you want to have generators with different configuration. Serializers, encrypters and
    signers should also be singletons.
-2. When sending to JavaScript big id needs to be cast to string (JS does not handle 64-bit int), use serializer output.
+2. When sending to JavaScript, 64-bit id needs to be cast to string (JS does not handle 64-bit int), use serializer output.
+3. All serializers uses alphabets to encode number to string. There are some predefined alphabets in Alphabets class,
+   e.g. without vowels to prevent building random words. Encoded string length also depends on alphabet length. 
 
 Generate ID:
 ```php
@@ -147,15 +149,12 @@ $serializer = new \Pvmlibs\FlexId\Serializers\HashSerializer();
 $serializer->serialize(123456); // ZMqf
 ```
 
-Encrypting ID:
+Encrypting ID to string:
 
 ```php
-$generator = new \Pvmlibs\FlexId\FlexIdGenerator(
-    workerResolver: new \Pvmlibs\FlexId\Resolvers\RedisTimestepWorkerResolver(client: $redisClient)
-);
 $secret = \Pvmlibs\FlexId\Tools\KeyGen::generate(); // generates 32-bit key
 
-// 64-bit encrypter, 128-bit key. Short output but no sign here, you can use addi
+// 64-bit encrypter, 128-bit key. Short output but no sign here, you can use Signer for sign.
 $encrypter = new \Pvmlibs\FlexId\Encrypters\Sparx64Encrypter(
     base64secret: $secret,
     serializer: new \Pvmlibs\FlexId\Serializers\BaseSerializer()
@@ -167,14 +166,21 @@ $encrypter->decrypt($publicId); // 43581127276918784
 $encrypter = new \Pvmlibs\FlexId\Encrypters\Sparx128Encrypter(
     base64secret: $secret,
     hmac: new \Pvmlibs\FlexId\HMAC\SiphashHMAC($secret), // we can pass the same key here - it will use hkdf
-    serializer: new \Pvmlibs\FlexId\Serializers\BaseSerializer()
+    // by default, serializers produce as small output as possible. With 128-bit block encrypters, output is encoded as
+    // from 2 encrypted 64-bit numbers. If first encoded number length is lower than max length for given alphabet, it uses separator (like X.Y).
+    // If you always want fixed length (2 * max 64-bit encoded length), use fixedLength: true.
+    serializer: new \Pvmlibs\FlexId\Serializers\BaseSerializer(fixedLength: false), 
+    separator: '.'
 );
 $publicId = $encrypter->encrypt($id); // dZRKYwQpWJyfgJRgZFyfVyFxYd
 
 // for best performance, high security and quite short output use Sparx128TurboEncrypter - requires flexid_utils extension
-// By default it uses Alphabets::CUSTOM_SEMI_SAFE, minimal length where you can produce up to 22 characters output.
+// By default it uses Alphabets::CUSTOM_SEMI_SAFE, using fixedLength: true it uses always 22 characters output.
 // See Alphabets class for more information about different alphabets.
-$encrypterTurbo = new \Pvmlibs\FlexId\Encrypters\Sparx128TurboEncrypter(base64secret: $secret);
+$encrypterTurbo = new \Pvmlibs\FlexId\Encrypters\Sparx128TurboEncrypter(
+        base64secret: $secret,
+        fixedLength: true
+);
 $encrypterTurbo->encrypt(123456); // zLF5bd5P42sppyEyVgGsi9
 
 ```
