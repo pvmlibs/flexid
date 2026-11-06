@@ -26,6 +26,7 @@ final class CustomSerializerPHPTest extends TestCase
     {
         $serializer = new CustomSerializerPHP(null);
         $this->validateSerializeDeserialize($serializer, true);
+        $this::assertFalse($serializer->isFixedLength());
 
         foreach ($this->alphabets() as $alphabet) {
             $serializer = new CustomSerializerPHP(alphabet: $alphabet);
@@ -42,6 +43,7 @@ final class CustomSerializerPHPTest extends TestCase
     {
         $serializer = new CustomSerializerPHP(fixedLength: true);
         $this->validateSerializeDeserialize($serializer, true);
+        $this::assertTrue($serializer->isFixedLength());
 
         foreach ($this->alphabets() as $alphabet) {
             $serializer = new CustomSerializerPHP(alphabet: $alphabet, fixedLength: true);

@@ -59,6 +59,8 @@ final class AesEncrypterTest extends TestCase
         for ($i = 0; $i < 1000; $i++) {
             $this::assertSame($encrypter->maxOutputLength(), \strlen($encrypter->encrypt($i)));
         }
+        $this::expectException(IdDecodeException::class);
+        $encrypter->decrypt(\substr(Alphabets::BASE32_SAFE_ALPHABET, 0, 10));
     }
 
     public function testInvalidSeparator(): void

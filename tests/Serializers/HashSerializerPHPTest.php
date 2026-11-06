@@ -234,6 +234,12 @@ final class HashSerializerPHPTest extends TestCase
         );
     }
 
+    public function testFixedLength(): void
+    {
+        $serializer = new HashSerializerPHP();
+        $this::assertFalse($serializer->isFixedLength());
+    }
+
     public function testBackwardCompatibility(): void
     {
         $encoder = new HashSerializerPHP(minLength: 1);

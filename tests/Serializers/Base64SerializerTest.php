@@ -40,6 +40,12 @@ final class Base64SerializerTest extends TestCase
         $serializer->deserialize('0123456789abcref.');
     }
 
+    public function testFixedLength(): void
+    {
+        $serializer = new Base64Serializer();
+        $this::assertFalse($serializer->isFixedLength());
+    }
+
     public function testEvenCharsDistribution(): void
     {
         $serializer = new Base64Serializer();

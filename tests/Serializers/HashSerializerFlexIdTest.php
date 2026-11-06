@@ -255,6 +255,12 @@ final class HashSerializerFlexIdTest extends TestCase
         }
     }
 
+    public function testFixedLength(): void
+    {
+        $serializer = new HashSerializerFlexIdExt();
+        $this::assertFalse($serializer->isFixedLength());
+    }
+
     public function testBackwardCompatibility(): void
     {
         $encoder = new HashSerializerFlexIdExt(minLength: 1);

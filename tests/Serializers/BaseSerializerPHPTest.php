@@ -23,6 +23,7 @@ final class BaseSerializerPHPTest extends TestCase
     {
         $serializer = new BaseSerializerPHP();
         $this->validateSerializeDeserialize($serializer);
+        $this::assertFalse($serializer->isFixedLength());
 
         foreach ($this->alphabets() as $alphabet) {
             if ((\strlen($alphabet) & (\strlen($alphabet) - 1)) === 0) { // only power of 2 for now
@@ -38,6 +39,7 @@ final class BaseSerializerPHPTest extends TestCase
     {
         $serializer = new BaseSerializerPHP(fixedLength: true);
         $this->validateSerializeDeserialize($serializer);
+        $this::assertTrue($serializer->isFixedLength());
 
         foreach ($this->alphabets() as $alphabet) {
             if ((\strlen($alphabet) & (\strlen($alphabet) - 1)) === 0) { // only power of 2 for now

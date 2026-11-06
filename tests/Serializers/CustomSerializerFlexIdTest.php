@@ -35,6 +35,7 @@ final class CustomSerializerFlexIdTest extends TestCase
     {
         $serializer = new CustomSerializerFlexIdExt();
         $this->validateSerializeDeserialize($serializer);
+        $this::assertFalse($serializer->isFixedLength());
 
         foreach ($this->alphabets() as $alphabet) {
             $serializer = new CustomSerializerFlexIdExt($alphabet);
@@ -48,6 +49,7 @@ final class CustomSerializerFlexIdTest extends TestCase
     {
         $serializer = new CustomSerializerFlexIdExt(fixedLength: true);
         $this->validateSerializeDeserialize($serializer);
+        $this::assertTrue($serializer->isFixedLength());
 
         foreach ($this->alphabets() as $alphabet) {
             $serializer = new CustomSerializerFlexIdExt($alphabet, true);
